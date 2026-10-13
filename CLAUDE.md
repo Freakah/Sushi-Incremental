@@ -58,10 +58,10 @@ Server-authoritative. The client only renders and sends requests; the server val
   the server the client is ready for sushi). UI is built in code with `UIKit` (shared menu style), and
   `MenuManager` keeps centre-screen menus exclusive. World boards are `BoardsController`; the big menus are
   `SkillTreeUIController`, `IndexController`, `TutorialController`, `FishingAnimController`, `SlashController`.
-- **Standalone scripts** (not part of the boot lists): `ServerScriptService/GroundSignBuilder` and
-  `Services/Script` (header: FishingPortalBuilder) build world geometry at runtime;
-  `StarterPlayerScripts/LocalScript` (FishingPortalAnimator), `PondFishAnimator` and `SushiSkyAmbience` are
-  client-side ambience. `ReplicatedFirst/LocalScript` contains only the single character `w` in the place.
+- **Standalone scripts** (not part of the boot lists): `ServerScriptService/GroundSignBuilder` builds world
+  geometry at runtime; `StarterPlayerScripts/PondFishAnimator` and `SushiSkyAmbience` are client-side
+  ambience. `workspace.FishingPortal` is a saved model now (animated via the `AnimatedPortal` tag), so the old
+  FishingPortalBuilder/Animator scripts were removed — don't bring them back. `ReplicatedFirst/LocalScript` contains only the single character `w` in the place.
 - CollectionService tags used by code: `UpgradeBoard`, `SellZone`, `Leaderboard`, `AnimatedPortal`,
   `AnimatedBar`, `SushiBoss`. Map lookups go through `workspace.Map`.
 
