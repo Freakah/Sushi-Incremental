@@ -4,54 +4,74 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Luau source for a Roblox incremental game ("Sushi Incremental"), synced into Roblox Studio with Rojo
+Luau source for "Sushi Incremental", a Roblox incremental game, synced into Roblox Studio with Rojo
 (`default.project.json`). There is no build step, linter config or test suite: the user runs `rojo serve`,
 connects the Studio plugin, and tests by pressing Play in Studio. If a Studio MCP server is connected, use it
 to inspect the place or read Output, but edit code in the files here rather than through Studio.
 
-Only scripts are in the repo. Parts, models, terrain and UI layouts live in the user's place file, and the
-place may contain scripts that haven't been moved into `src/` yet. Every service in the project file sets
-`$ignoreUnknownInstances`, so Rojo never deletes things it doesn't manage — keep it that way.
+`src/` was exported 1:1 from the live place (every Script, LocalScript and ModuleScript under
+ServerScriptService, ReplicatedStorage, ReplicatedFirst and StarterPlayer). Parts, models, terrain, UI,
+`ReplicatedStorage.Remotes`, `ReplicatedStorage.Assets` and similar live only in the place file. Every service
+in the project file, and every folder under `src/` (via `init.meta.json`), sets `ignoreUnknownInstances`, so
+Rojo never deletes things it doesn't manage — keep it that way, and give any new subfolder the same
+`init.meta.json`.
+
+The place also has scripts that are deliberately **not** in the repo: `ServerStorage` backups and build
+modules (`Backup_*`, `BuildTools.*`), and two client-RunContext Scripts inside Workspace models
+(`Map.SushiPond.FishRuneAltar.AltarAnimator`, `SushiBoss.BossIdle`). Edit those in Studio.
 
 ## Layout and naming
 
-- `src/server` → ServerScriptService, `src/shared` → ReplicatedStorage, `src/client` →
-  StarterPlayer.StarterPlayerScripts, `src/first` → ReplicatedFirst. Files map directly into the service (no
-  wrapper folder), so `game.ServerScriptService.UpgradeService` etc. resolve as written.
-- `*.server.luau` = Script, `*.client.luau` = LocalScript, other `*.luau` = ModuleScript. The file name is the
-  instance name, and scripts `require`/`WaitForChild` each other by that name, so renames must be updated at
-  every call site.
-- `tools/` is **not** synced. Its files (`*.command.luau` and the generators in `tools/Mountain/` and
-  `tools/SakuraTree/`) are pasted whole into Studio's Command Bar and run once at edit time. They must be fully
-  self-contained (no `require`), run in edit mode, place their output where the camera is looking, set
-  `ChangeHistoryService` waypoints so Ctrl+Z works, and select the result. Re-running replaces what the
-  previous run created. Each file's header comment is its usage guide for the user — keep it accurate.
-- Most files start with a `CONFIG` table of user-tweakable values; put new knobs there rather than inline.
+- `src/<Service>/...` mirrors the Explorer exactly: `src/ServerScriptService`, `src/ReplicatedStorage`,
+  `src/ReplicatedFirst`, `src/StarterPlayer/StarterPlayerScripts`. A folder in `src/` is a Folder in Studio.
+- `*.server.luau` = Script, `*.client.luau` = LocalScript, other `*.luau` = ModuleScript. A script with
+  children would be a folder with `init.server.luau` / `init.client.luau` / `init.luau` (none today). The file
+  name is the instance name and scripts find each other by path (`ReplicatedStorage.Shared.Config.X`,
+  `script.Parent.PlayerDataService`, `Controllers:WaitForChild(name)`), so renames must be updated everywhere.
+- Rojo cannot sync two siblings with the same name, so keep names unique within a folder.
+- Studio sources are kept byte-exact (`.gitattributes` disables line-ending conversion).
 
-Because Command Bar scripts can't share modules, helpers such as `findOrigin`, `block`, `shaded`,
-`mountainBlock` and `summit`, plus the pastel palette, are **copy-pasted** across the `tools/Mountain/`
-generators. A fix to one helper usually needs to be applied to the others. `tools/Sky/SkySetup.command.luau`
-likewise embeds a LocalScript's source as a string and writes it to StarterPlayerScripts.
+## Architecture
 
-## Upgrade boards
+Server-authoritative. The client only renders and sends requests; the server validates everything.
 
-- `UpgradeConfig` (src/shared) is the single source of truth shared by server and client: currencies,
-  upgrades (`BaseCost`, `CostGrowth`, `Value(level)`, `Currency`), which board shows which upgrade, rebirth
-  rules, `FormatNumber`, and derived stats (`GetStats`). Upgrade levels live in player attributes
-  `Upg_<UpgradeId>` and `RebirthCount`, so the client reads them without extra networking.
-- `UpgradeService` (src/server, started by `UpgradeServer`) owns currencies (`leaderstats.Cash`/`Rebirths`,
-  reused if the game already creates them), validates purchases and rebirths, and saves via DataStore
-  (`DataStoreName`; bump the version suffix if the save format changes). It creates a single RemoteEvent
-  `UpgradeShopRemote` in ReplicatedStorage taking `("Buy", upgradeId, buyMax)` or `("Rebirth")`, rate-limited
-  per player. Other server scripts use `AwardCash` and `GetStats`.
-- `UpgradeBoards` (src/client) draws SurfaceGui boards onto the parts in `Workspace.UpgradeBoards` (created by
-  `tools/UpgradeShop/CreateBoards.command.luau`; part sizes match the UI canvas aspect ratios) and only sends
-  requests — never trust it for game state.
-- `Config.StudioTestIncome` gives free cash only when `RunService:IsStudio()`.
+- **Server boot:** `ServerScriptService/ServerMain` requires each module in `Services/` in a fixed order and
+  calls `Start()`. Add a new service to that `order` list.
+- **`PlayerDataService`** owns all persistent data (DataStore `STORE_NAME = "SushiIncremental_v1"`,
+  `DATA_VERSION`, autosave). It mirrors every value the client needs onto **Player attributes** (`Money`, `KG`,
+  `Prestiges`, upgrade levels via each config's `AttributeName(id)`, `Idx_<sushi>`, rune counts, …) and
+  leaderstats, so clients read state from attributes instead of extra remotes. Other services require it and
+  listen to its `PlayerLoaded` / `StatsChanged` BindableEvent signals.
+- **Gameplay services** (`Services/`): `SushiService` (per-player sushi spawning + validated collection),
+  `EconomyService` (KG → Cash at sell stalls), `UpgradeService`, `PrestigeService`, `RebirthService`,
+  `AscensionService` (Blood Altar), `SkillTreeService`, `ZoneService` (portal travel), `FishingService`
+  (Sushi Pond), `SlashService` (Sushi Slashing), `RuneService` (Rune Altars), `AutomationService`,
+  `ProfileShopService` (titles, nametags, Robux passes/products), `LeaderboardService` (Hall of Fame boards),
+  `AdminService` (admin panel, UserId allow-list).
+- **Networking:** remotes live in the place's `ReplicatedStorage.Remotes` folder. Services get-or-create them
+  by name with a local `remote(name, className)` helper; controllers `WaitForChild` the same names.
+- **Shared config** (`ReplicatedStorage/Shared/Config/*Config`, `SushiCatalog`, `PadLanternAnim`) is the single
+  source of truth for numbers, costs and content, used by both sides. `Shared/SushiModels` builds procedural
+  sushi models; `Shared/Util/NumberFormat` formats big numbers.
+- **Client boot:** `StarterPlayerScripts/ClientMain` requires each module in `Controllers/` in order and calls
+  `Init()` inside `pcall`, so one broken controller only warns. `SushiController` must stay last (it tells
+  the server the client is ready for sushi). UI is built in code with `UIKit` (shared menu style), and
+  `MenuManager` keeps centre-screen menus exclusive. World boards are `BoardsController`; the big menus are
+  `SkillTreeUIController`, `IndexController`, `TutorialController`, `FishingAnimController`, `SlashController`.
+- **Standalone scripts** (not part of the boot lists): `ServerScriptService/GroundSignBuilder` and
+  `Services/Script` (header: FishingPortalBuilder) build world geometry at runtime;
+  `StarterPlayerScripts/LocalScript` (FishingPortalAnimator), `PondFishAnimator` and `SushiSkyAmbience` are
+  client-side ambience. `ReplicatedFirst/LocalScript` contains only the single character `w` in the place.
+- CollectionService tags used by code: `UpgradeBoard`, `SellZone`, `Leaderboard`, `AnimatedPortal`,
+  `AnimatedBar`, `SushiBoss`. Map lookups go through `workspace.Map`.
 
-## Other pieces
+## Build tools (`tools/`, not synced)
 
-- `src/first/LoadingScreen.client.luau` prints `[LoadingScreen] ...` status lines to Output for troubleshooting.
-- `tools/Squishies/MakiBuilder` builds a model tagged `SquishySushi`; `src/client/SquishyAnimator` animates
-  every model with that CollectionService tag, so spawned clones animate automatically.
-- Visual style is soft pastel / kawaii with the `FredokaOne` font; match it in new UI or models.
+Files here are pasted whole into Studio's Command Bar and run once at edit time. They must be fully
+self-contained (no `require`), run in edit mode, place their output where the camera is looking, set
+`ChangeHistoryService` waypoints so Ctrl+Z works, and select the result. Each file's header comment is its
+usage guide — keep it accurate. Helpers and the pastel palette are copy-pasted across the `tools/Mountain/`
+generators, so a fix to one usually belongs in the others. `tools/UpgradeShop` and `tools/Squishies` were
+written for an earlier version of the game whose scripts are no longer in it.
+
+Visual style is soft pastel / kawaii with the `FredokaOne` font; match it in new UI or models.
