@@ -1,3 +1,4 @@
 # Keep script sources byte-for-byte as exported from Studio (no CRLF conversion on Windows).
 *.luau -text
 *.lua -text
+*.bat text eol=crlf

@@ -5,7 +5,7 @@ Scripts for the Sushi Incremental Roblox game, synced into Studio with [Rojo](ht
 ## Running it
 
 1. Back up your place first: File > Save to File As…
-2. In a terminal in this folder: `rojo serve`
+2. Double-click `start-rojo.bat` (or run `.\rojo serve` in a terminal in this folder) and leave the window open
 3. In Studio: Plugins > Rojo > Connect
 
 Files in `src/` now show up live in Studio. Edit them here, not in Studio: Studio edits to synced scripts
