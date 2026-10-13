@@ -6,6 +6,7 @@
 -- so it survives rejoining and never shows for existing players.
 -- Phones get a compact pill (tap to expand); on PC you can click the bubble to shrink it.
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -102,9 +103,11 @@ end
 
 -- top of a flat board part, plus a little air
 local function boardTop(name: string): Vector3?
-	local boards = map:FindFirstChild("UpgradeBoards")
-	local b = boards and boards:FindFirstChild(name)
-	if not (b and b:IsA("BasePart")) then return nil end
+	local b
+	for _, p in ipairs(CollectionService:GetTagged("UpgradeBoard")) do
+		if p.Name == name and p:IsA("BasePart") and p:IsDescendantOf(workspace) then b = p break end
+	end
+	if not b then return nil end
 	return b.Position + Vector3.new(0, b.Size.Y / 2 + 2.6, 0)
 end
 
@@ -157,8 +160,9 @@ local STEPS = {
 		Target = function()
 			-- point at the sell screen on the counter
 			local market = map:FindFirstChild("SushiMarket")
-			local screen = market and market:FindFirstChild("Converter") :: BasePart?
-			if screen then return screen.Position + Vector3.new(0, screen.Size.Y / 2 + 3, 0) end
+			local screen = boardTop("Converter")
+			if screen then return screen + Vector3.new(0, 0.4, 0) end
+
 			local p = pivotOf(market and market:FindFirstChild("SellZone"))
 			return p and p + Vector3.new(0, 8, 0)
 		end,

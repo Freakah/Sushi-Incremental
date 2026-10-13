@@ -24,7 +24,7 @@ ZoneConfig.List = {
 	{
 		Id = "Fishing", Name = "Sushi Pond", Icon = "🎣", Color = Color3.fromRGB(110, 205, 255),
 		-- the fishing area (no sushi pad), reached through the Fishing portal at the end of
-		-- the path behind the Sushi Bar; the ReturnPad at the pond's entrance leads back.
+		-- the path behind the Sushi Bar (workspace.FishingPortal); the ReturnPad at the pond's entrance leads back.
 		-- Opens at Rebirth 1 (shown as that Rebirth's unlock on the Rebirth board).
 		RequiredRebirths = 1, KGMultiplier = 1, LuckMultiplier = 1,
 		Subtitle = "The fishing area",
@@ -32,11 +32,20 @@ ZoneConfig.List = {
 	},
 	{
 		Id = "Slashing", Name = "Sushi Slashing", Icon = "🗡️", Color = Color3.fromRGB(255, 90, 80),
-		-- the slashing arena, reached through the torii gate (Map.SlashingPortal) on the
-		-- left of the Sushi Bar; the ReturnPad in its entrance leads back.
+		-- the slashing arena, reached through the slash portal (Map.SlashingPortal) on the
+		-- left of the Sushi Bar; the fishing-style portal at the end of its entrance (Map.SlashingReturnPortal) leads back.
 		RequiredRebirths = 2, KGMultiplier = 1, LuckMultiplier = 1,
 		Subtitle = "The slashing arena",
 		ArrivalPath = { "Map", "SushiSlashing", "Arrival" },
+	},
+	{
+		Id = "Dropper", Name = "Sushi Restaurant", Icon = "🏮", Color = Color3.fromRGB(255, 150, 70),
+		-- the dropper world (placeholder: no gameplay yet), reached through the placeholder portal
+		-- on the right of the Sushi Bar (Map.DropperPortal); the portal at the end of the
+		-- restaurant's entrance path (Map.SushiRestaurant.DropperReturnPortal) leads back.
+		RequiredRebirths = 3, KGMultiplier = 1, LuckMultiplier = 1,
+		Subtitle = "The dropper world",
+		ArrivalPath = { "Map", "SushiRestaurant", "Arrival" },
 	},
 }
 

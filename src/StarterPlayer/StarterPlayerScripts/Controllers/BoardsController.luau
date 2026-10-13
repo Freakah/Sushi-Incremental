@@ -848,6 +848,10 @@ local function buildBoardFor(part: BasePart)
 	local boardType = part:GetAttribute("BoardType")
 	local size = CANVAS[boardType]
 	if not size then return end
+	-- the label that shows which board this is in Studio's Edit mode
+	local preview = part:FindFirstChild("EditPreview")
+	if preview then preview:Destroy() end
+	part.Transparency = 1 -- only tinted so it can be clicked and moved in Edit mode
 	local sg = new("SurfaceGui", {
 		Name = boardType,
 		Adornee = part,
