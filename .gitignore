@@ -1,0 +1,6 @@
+# Place files and Studio lock/backup files
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+*.rbxlx.lock
+sourcemap.json
