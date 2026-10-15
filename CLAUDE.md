@@ -74,4 +74,7 @@ usage guide — keep it accurate. Helpers and the pastel palette are copy-pasted
 generators, so a fix to one usually belongs in the others. `tools/UpgradeShop` and `tools/Squishies` were
 written for an earlier version of the game whose scripts are no longer in it.
 
-Visual style is soft pastel / kawaii with the `FredokaOne` font; match it in new UI or models.
+Visual style: bright, saturated, blocky low-poly cartoon — checkerboard grass/dirt, chunky cube trees, terraced
+cliffs on floating islands (Minecraft meets Sonic's Green Hill), flat solid colours with little texture detail,
+plus cute kawaii / Japanese sushi-shop touches (maneki-neko cat, lanterns, pagoda roofs, wooden decks). UI uses the
+`FredokaOne` font. Match this in new UI and models; avoid realistic textures or washed-out pastels.
