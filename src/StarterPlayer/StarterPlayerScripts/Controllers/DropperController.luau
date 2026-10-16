@@ -5,7 +5,8 @@
 --   only shows the ride: fall from the nozzle onto the belt (real physics, at rest under the nozzle,
 --   passing through the dropper by collision group), ride upright around the U, sparkle through
 --   each owned UpgradePortal gate (its upgrade_field, once per gate), and vanish into the Neko
---   head with "+X 🐱".
+--   head with "+X 🐱" (the mouth glows, coins burst). Locally the straight belt pieces turn dark with
+--   chevrons that scroll at your conveyor speed.
 --   Each buy pad is a clone of Assets.Dropper.UpgradePad; stepping on its button asks the server
 --   to buy (RequestBuyDropper / RequestBuyUpgrader).
 
@@ -40,6 +41,7 @@ local pads = {} -- { Model, Kind = "Dropper" | "Gate", Index, Cost, Last, Rest =
 local items = {} -- { Model, Root, Offset, Height, Slot, Speed, Value, T0, Falling, Passed = { [gate] = true } }
 local itemByRoot: { [BasePart]: any } = {}
 local pool = {}
+local beltSpeed = DropperConfig.BaseSpeed -- studs/s of your belt, from the latest drop
 local overlap = OverlapParams.new()
 overlap.FilterType = Enum.RaycastFilterType.Include
 
@@ -346,6 +348,8 @@ local function spawnItem(slot: number, speed: number, value: number)
 	it.Root.AssemblyLinearVelocity = Vector3.zero
 	it.Root.AssemblyAngularVelocity = Vector3.zero
 	table.insert(items, it)
+	beltSpeed = speed
+	EffectsController.Burst(spot.Spout, Color3.new(1, 1, 1), 6) -- a little puff at the nozzle
 end
 
 -- the field glows brighter for a moment and sparkles where the neko went through
@@ -383,8 +387,94 @@ local function checkGates()
 	end
 end
 
+-- ===== belt look (client only): dark belt with chevrons scrolling at your conveyor speed =====
+
+local STRIPE = 2.5 -- studs between chevrons
+local PPS = 40 -- SurfaceGui pixels per stud
+local stripes = {} -- { Frame, Start = belt distance at the piece's start }
+local mouthLight: PointLight? = nil
+
+local function stripeBelt(belt: BasePart, start: number, len: number)
+	belt.TextureID = ""
+	belt.Color = Color3.fromRGB(70, 52, 50)
+	local g = Instance.new("SurfaceGui")
+	g.Face = Enum.NormalId.Top
+	g.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	g.PixelsPerStud = PPS
+	g.ClipsDescendants = true
+	-- on the Top face the gui's x runs across the belt and +y runs along it, the way the neko ride
+	local scroll = Instance.new("Frame")
+	scroll.BackgroundTransparency = 1
+	scroll.Size = UDim2.new(1, 0, 1, STRIPE * PPS * 2)
+	scroll.Parent = g
+	for k = 0, math.ceil(len / STRIPE) + 1 do
+		local t = Instance.new("TextLabel")
+		t.BackgroundTransparency = 1
+		t.AnchorPoint = Vector2.new(0.5, 0.5)
+		t.Position = UDim2.new(0.5, 0, 0, (k + 0.5) * STRIPE * PPS)
+		t.Size = UDim2.fromOffset(STRIPE * PPS, 2.2 * PPS)
+		t.Rotation = 90 -- ">" turned to point down the gui, i.e. along the belt
+		t.Text = ">"
+		t.Font = Enum.Font.FredokaOne
+		t.TextScaled = true
+		t.TextColor3 = Color3.fromRGB(255, 225, 160)
+		t.TextTransparency = 0.45
+		t.Parent = scroll
+	end
+	g.Parent = belt
+	table.insert(stripes, { Frame = scroll, Start = start })
+end
+
+-- finds the server-built straight belt pieces by where DropperService put them (corner slices stay plain)
+local function dressBelt()
+	local machine = workspace:WaitForChild("Map"):WaitForChild("SushiRestaurant"):WaitForChild("NekoMachine", 60)
+	local conveyor = machine and machine:WaitForChild("Conveyor", 10)
+	if not conveyor then return end
+	local belts = {}
+	for _, b in ipairs(conveyor:GetDescendants()) do
+		if b.Name == "Belt" and b:IsA("MeshPart") then table.insert(belts, b) end
+	end
+	for _, q in ipairs(L.Pieces) do
+		if q.Arc then continue end
+		local n = math.max(1, math.round(q.Length / DropperConfig.TileLength))
+		local len = q.Length / n
+		for k = 1, n do
+			local d = q.Start + len * (k - 0.5)
+			local p = L.At(d)
+			for _, b in ipairs(belts) do
+				if Vector2.new(b.Position.X - p.X, b.Position.Z - p.Z).Magnitude < 0.2 then
+					stripeBelt(b, d - len / 2, len)
+					break
+				end
+			end
+		end
+	end
+	local cat = machine:FindFirstChild("SellCat")
+	local zone = cat and cat:FindFirstChild("SellZone", true)
+	if zone then
+		local light = Instance.new("PointLight")
+		light.Color = Color3.fromRGB(255, 205, 90)
+		light.Range = 12
+		light.Brightness = 0
+		light.Parent = zone
+		mouthLight = light
+	end
+end
+
+local function scrollBelt(now: number)
+	for _, s in ipairs(stripes) do
+		local off = (now * beltSpeed - s.Start) % STRIPE -- same phase on every piece, so chevrons line up
+		s.Frame.Position = UDim2.fromOffset(0, (off - STRIPE) * PPS)
+	end
+end
+
 local function sold(it)
 	local mouth = L.At(L.Length) + Vector3.new(0, 1, 0)
+	if mouthLight then
+		mouthLight.Brightness = 3
+		TweenService:Create(mouthLight, TweenInfo.new(0.35), { Brightness = 0 }):Play()
+	end
+	EffectsController.Burst(mouth, Color3.fromRGB(255, 205, 90), 8)
 	EffectsController.Burst(mouth, NEKO, 14)
 	EffectsController.FloatingText(mouth + Vector3.new(0, 1.5, 0), "+" .. NumberFormat.Format(it.Value) .. " 🐱", NEKO)
 	EffectsController.PlaySound("Collect", 1.15 + math.random() * 0.2)
@@ -421,6 +511,7 @@ local function step()
 		it.Root.CFrame = CFrame.lookAt(p, p + dir) * it.Offset
 	end
 	checkGates()
+	if player:GetAttribute("Zone") == DropperConfig.Zone then scrollBelt(now) end
 end
 
 local function clearItems()
@@ -461,6 +552,7 @@ function DropperController.Init()
 			celebrate(gates[i], L.Gates[i].CFrame.Position, "✨ x" .. NumberFormat.Format(L.Gates[i].Mult) .. " UPGRADER!")
 		end)
 		Remotes:WaitForChild("DropperDrop").OnClientEvent:Connect(spawnItem)
+		dressBelt()
 	end)
 
 	player:GetAttributeChangedSignal("Zone"):Connect(function()
