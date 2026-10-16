@@ -6,7 +6,7 @@
 --   neko): while a player is in the Dropper zone, every owned dropper drops on a server timer,
 --   the server works out the neko's value (gates it will pass), tells that player's client
 --   (DropperDrop) and pays 🐱 Neko when it would reach the head. The client never reports sales.
---   Droppers (in order) and gates (any order) are bought on buy pads (validated: zone,
+--   Droppers and gates (each in order) are bought on buy pads (validated: zone,
 --   distance, price, rate).
 
 local Players = game:GetService("Players")
@@ -107,6 +107,32 @@ local function buildMachine(L)
 			else
 				local n = math.max(1, math.round(q.Length / DropperConfig.TileLength))
 				for k = 1, n do belt(model, conveyor, L, q.Start + q.Length * (k - 0.5) / n, q.Length / n) end
+			end
+		end
+		-- an end cap closes the open start of the belt, in the rails' colours (their mesh is textured)
+		local frame = conveyor:FindFirstChild("Frame", true) :: BasePart?
+		if frame then
+			local start, dir = L.At(0)
+			local floor = start - Vector3.new(0, DropperConfig.BeltHeight, 0)
+			local back = CFrame.lookAt(floor, floor + dir) * CFrame.new(0, 0, 0.25) -- just behind the start
+			local w, h = DropperConfig.BeltHalfWidth * 2, frame.Size.Y
+			local function capPart(name: string, size: Vector3, cf: CFrame, color: Color3): Part
+				local p = Instance.new("Part")
+				p.Name = name
+				p.Anchored = true
+				p.Size = size
+				p.CFrame = cf
+				p.Color = color
+				p.Material = Enum.Material.SmoothPlastic
+				p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
+				p.Parent = model
+				return p
+			end
+			capPart("BeltEndCap", Vector3.new(w, h, 0.5), back * CFrame.new(0, h / 2, 0), Color3.fromRGB(150, 75, 45))
+			capPart("BeltEndTrim", Vector3.new(w + 0.02, 0.25, 0.52), back * CFrame.new(0, 0.3, 0), Color3.fromRGB(190, 45, 40))
+			for _, x in ipairs({ -w / 4, w / 4 }) do
+				local stud = capPart("BeltEndStud", Vector3.new(0.12, 0.3, 0.3), back * CFrame.new(x, h * 0.65, 0.28) * CFrame.Angles(0, math.pi / 2, 0), Color3.fromRGB(225, 175, 70))
+				stud.Shape = Enum.PartType.Cylinder
 			end
 		end
 		model.Parent = machine
@@ -211,6 +237,9 @@ function DropperService.Start()
 		if typeof(i) ~= "number" or i ~= math.floor(i) then return end
 		local gate = layout and layout.Gates[i]
 		if not gate or not canBuy(player, gate.Pad, BUY_COOLDOWN) then return end
+		for j = 1, i - 1 do -- gates are bought in order
+			if player:GetAttribute(DropperConfig.GateAttribute(j)) ~= true then return end
+		end
 		if PlayerDataService.BuyUpgrader(player, i) then
 			gateBought:FireClient(player, i)
 		end

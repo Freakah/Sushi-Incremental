@@ -36,7 +36,7 @@ local padAsset: Model
 local portalAsset: Model
 local droppers: { [number]: Model } = {}
 local gates: { [number]: Model } = {}
-local pads = {} -- { Model, Kind = "Dropper" | "Gate", Index, Cost, Last, Rest = { [button part] = CFrame }, BodyColor, Pill, Shade }
+local pads = {} -- { Model, Kind = "Dropper" | "Gate", Index, Cost, Last, Rest = { [button part] = CFrame }, BodyColor, Price }
 local items = {} -- { Model, Root, Offset, Height, Slot, Speed, Value, T0, Falling, Passed = { [gate] = true } }
 local itemByRoot: { [BasePart]: any } = {}
 local pool = {}
@@ -54,24 +54,20 @@ local function anchoredClone(src: Model): Model
 	return m
 end
 
--- ===== the speech bubble over a buy pad =====
--- Sized in studs (everything inside is scale-based) so it reads like part of the world.
+-- ===== the label bubble over a buy pad =====
+-- A plain dark-wood bubble like the restaurant's beams. Sized in studs (everything inside is
+-- scale-based) so it reads like part of the room.
 
-local BUBBLE_BORDER = Color3.fromRGB(255, 130, 180)
-local BUBBLE_FILL = Color3.fromRGB(255, 249, 240)
-local BUBBLE_TEXT = Color3.fromRGB(95, 40, 75)
-local PILL_CAN = { Color3.fromRGB(80, 200, 115), Color3.fromRGB(45, 150, 80) }   -- face, underside
-local PILL_CANT = { Color3.fromRGB(245, 100, 150), Color3.fromRGB(190, 60, 110) }
+local BUBBLE_WOOD = Color3.fromRGB(62, 36, 28)
+local BUBBLE_TEXT = Color3.fromRGB(255, 240, 215)
+local PRICE_CAN = Color3.fromRGB(255, 205, 90)   -- gold: you can afford it
+local PRICE_CANT = Color3.fromRGB(235, 125, 110) -- soft red: not yet
 
 local function ui(className: string, props: { [string]: any }, parent: Instance): any
 	local o = Instance.new(className)
 	for k, v in pairs(props) do (o :: any)[k] = v end
 	o.Parent = parent
 	return o
-end
-
-local function round(parent: Instance, r: number)
-	ui("UICorner", { CornerRadius = UDim.new(r, 0) }, parent)
 end
 
 local function text(parent: Instance, props: { [string]: any }): TextLabel
@@ -82,44 +78,27 @@ local function text(parent: Instance, props: { [string]: any }): TextLabel
 	return ui("TextLabel", props, parent)
 end
 
--- returns the price pill and its underside, so they can be recoloured when you can afford it
-local function bubble(adornee: BasePart, title: string, price: string): (Frame, Frame)
+-- returns the price label, recoloured when you can (or can't) afford it
+local function bubble(adornee: BasePart, title: string, price: string): TextLabel
 	local bb = ui("BillboardGui", {
-		Size = UDim2.fromScale(7.6, 4.2),
-		StudsOffsetWorldSpace = Vector3.new(0, 6.6, 0),
+		Size = UDim2.fromScale(6, 3),
+		StudsOffsetWorldSpace = Vector3.new(0, 6, 0),
 		MaxDistance = 80,
 		LightInfluence = 0,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	}, adornee)
-	local shadow = ui("Frame", { Position = UDim2.fromScale(0, 0.07), Size = UDim2.fromScale(1, 0.76),
-		BackgroundColor3 = Color3.fromRGB(70, 25, 50), BackgroundTransparency = 0.65, ZIndex = 1 }, bb)
-	round(shadow, 0.32)
-	local tail = ui("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.76),
-		Size = UDim2.fromScale(0.24, 0.24), SizeConstraint = Enum.SizeConstraint.RelativeYY, Rotation = 45,
-		BackgroundColor3 = BUBBLE_BORDER, ZIndex = 2 }, bb)
-	round(tail, 0.15)
-	local border = ui("Frame", { Size = UDim2.fromScale(1, 0.76), BackgroundColor3 = BUBBLE_BORDER, ZIndex = 3 }, bb)
-	round(border, 0.32)
-	local fill = ui("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.942, 0.86), BackgroundColor3 = Color3.new(1, 1, 1) }, border) -- an even rim
-	round(fill, 0.3)
-	ui("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), BUBBLE_FILL) }, fill)
-	text(fill, { Position = UDim2.fromScale(0.05, 0.06), Size = UDim2.fromScale(0.9, 0.4), TextColor3 = BUBBLE_TEXT, Text = title })
-	local shade = ui("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.56),
-		Size = UDim2.fromScale(0.66, 0.4) }, fill)
-	round(shade, 0.5)
-	local pill = ui("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromScale(0.66, 0.4) }, fill)
-	round(pill, 0.5)
-	text(pill, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.9, 0.86),
-		TextColor3 = Color3.new(1, 1, 1), Text = price })
-	return pill, shade
+	ui("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.8),
+		Size = UDim2.fromScale(0.2, 0.2), SizeConstraint = Enum.SizeConstraint.RelativeYY, Rotation = 45,
+		BackgroundColor3 = BUBBLE_WOOD, BackgroundTransparency = 0.08, ZIndex = 1 }, bb)
+	local body = ui("Frame", { Size = UDim2.fromScale(1, 0.8), BackgroundColor3 = BUBBLE_WOOD,
+		BackgroundTransparency = 0.08, ZIndex = 2 }, bb)
+	ui("UICorner", { CornerRadius = UDim.new(0.25, 0) }, body)
+	text(body, { Position = UDim2.fromScale(0.06, 0.1), Size = UDim2.fromScale(0.88, 0.42), TextColor3 = BUBBLE_TEXT, Text = title })
+	return text(body, { Position = UDim2.fromScale(0.06, 0.52), Size = UDim2.fromScale(0.88, 0.36), TextColor3 = PRICE_CAN, Text = price })
 end
 
--- green pill when you can afford it, pink when you can't
 local function paintPrice(pad)
-	local c = if (player:GetAttribute("Neko") or 0) >= pad.Cost then PILL_CAN else PILL_CANT
-	pad.Pill.BackgroundColor3, pad.Shade.BackgroundColor3 = c[1], c[2]
+	pad.Price.TextColor3 = if (player:GetAttribute("Neko") or 0) >= pad.Cost then PRICE_CAN else PRICE_CANT
 end
 
 -- grows the model from nothing to its current scale
@@ -250,7 +229,7 @@ local function makePad(pos: Vector3, name: string, kind: string, index: number, 
 	local body = m:FindFirstChild("button_body") :: BasePart?
 	pad.BodyColor = body and body.Color
 	local price = if cost == 0 then "FREE!" else "🐱 " .. NumberFormat.Format(cost)
-	pad.Pill, pad.Shade = bubble(m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart"), name, price)
+	pad.Price = bubble(m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart"), name, price)
 	paintPrice(pad)
 	m.Parent = folder
 	table.insert(pads, pad)
@@ -326,7 +305,8 @@ local function refresh()
 	if next_ and cost then
 		makePad(next_.Pad, if cost == 0 then "First Dropper" else "New Dropper!", "Dropper", owned + 1, cost)
 	end
-	-- gates: owned ones exist, the rest are only a pad
+	-- gates: owned ones exist; only the next one (in order) has a pad
+	local padShown = false
 	for i, g in ipairs(L.Gates) do
 		local has = player:GetAttribute(DropperConfig.GateAttribute(i)) == true
 		if has and not gates[i] then
@@ -335,8 +315,9 @@ local function refresh()
 			gates[i]:Destroy()
 			gates[i] = nil
 		end
-		if not has then
-			makePad(g.Pad, 'Upgrader <font color="#3c9be6">x' .. NumberFormat.Format(g.Mult) .. "</font>", "Gate", i, g.Cost)
+		if not has and not padShown then
+			padShown = true
+			makePad(g.Pad, "Upgrader x" .. NumberFormat.Format(g.Mult), "Gate", i, g.Cost)
 		end
 	end
 end

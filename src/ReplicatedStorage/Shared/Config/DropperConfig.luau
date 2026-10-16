@@ -36,7 +36,7 @@ DropperConfig.DropperCosts = { 0, 25, 100, 400 } -- Neko for dropper 1, 2, ... (
 DropperConfig.PadRadius = 3        -- walk within this many studs of a pad's centre to buy
 DropperConfig.PadGap = 1           -- studs between a pad and the dropper/gate it buys
 
--- ===== upgrader gates (any order; one per UpgraderSlots marker) =====
+-- ===== upgrader gates (bought in order; one per UpgraderSlots marker) =====
 DropperConfig.Upgraders = {
 	{ Mult = 1.5, Cost = 100 },
 	{ Mult = 2, Cost = 500 },
@@ -186,7 +186,8 @@ function DropperConfig.Layout()
 		local d = nearest(spout)
 		local land = L.At(d)
 		local shift = flat(land - spout)
-		local pad = f.Position + shift - f.RightVector * (math.max(m.Size.X, boxSize.Z) / 2 + DropperConfig.PadGap + DropperConfig.PadRadius)
+		-- the pad stands on the marker's right-hand side (facing the belt)
+		local pad = f.Position + shift + f.RightVector * (math.max(m.Size.X, boxSize.Z) / 2 + DropperConfig.PadGap + DropperConfig.PadRadius)
 		L.Droppers[i] = { Pivot = pivot + shift, Spout = spout + shift, Land = land, D = d, Pad = clearOfBelt(pad) }
 		table.insert(L.Markers, m)
 	end
