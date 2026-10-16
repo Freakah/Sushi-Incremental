@@ -3,8 +3,9 @@
 --   Everything is placed from DropperConfig.Layout() (the NekoLayout markers). The server decides
 --   when each dropper drops (DropperDrop, with the neko's value) and pays the Neko itself; this
 --   only shows the ride: fall from the nozzle onto the belt (real physics, at rest under the nozzle,
---   passing through the dropper by collision group), ride upright around the U, flash
---   each owned gate it passes, and vanish into the Neko head with "+X 🐱".
+--   passing through the dropper by collision group), ride upright around the U, sparkle through
+--   each owned UpgradePortal gate (its upgrade_field, once per gate), and vanish into the Neko
+--   head with "+X 🐱".
 --   Each buy pad is a clone of Assets.Dropper.UpgradePad; stepping on its button asks the server
 --   to buy (RequestBuyDropper / RequestBuyUpgrader).
 
@@ -24,7 +25,6 @@ local player = Players.LocalPlayer
 local DropperController = {}
 
 local NEKO = Color3.fromRGB(255, 175, 210)
-local CREAM = Color3.fromRGB(255, 243, 225)
 local RED = Color3.fromRGB(205, 70, 70)
 local GATE = Color3.fromRGB(150, 210, 255)
 
@@ -33,11 +33,15 @@ local folder: Folder
 local dropperAsset: Model
 local nekoAsset: Model
 local padAsset: Model
+local portalAsset: Model
 local droppers: { [number]: Model } = {}
 local gates: { [number]: Model } = {}
 local pads = {} -- { Model, Kind = "Dropper" | "Gate", Index, Cost, Last, Rest = { [button part] = CFrame }, BodyColor }
-local items = {} -- { Root, Offset, Slot, Speed, Value, T0, LastD }
+local items = {} -- { Model, Root, Offset, Height, Slot, Speed, Value, T0, Falling, Passed = { [gate] = true } }
+local itemByRoot: { [BasePart]: any } = {}
 local pool = {}
+local overlap = OverlapParams.new()
+overlap.FilterType = Enum.RaycastFilterType.Include
 
 local function anchoredClone(src: Model): Model
 	local m = src:Clone()
@@ -48,22 +52,6 @@ local function anchoredClone(src: Model): Model
 		end
 	end
 	return m
-end
-
-local function part(m: Instance, name: string, size: Vector3, cf: CFrame, color: Color3, ghost: boolean, neon: boolean?): Part
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Anchored = true
-	p.Size = size
-	p.CFrame = cf
-	p.Color = color
-	p.Material = if neon then Enum.Material.Neon else Enum.Material.SmoothPlastic
-	p.Transparency = if ghost then 0.75 elseif neon then 0.55 else 0
-	p.CanCollide = not ghost and not neon
-	p.CanQuery, p.CanTouch = false, false
-	p.TopSurface, p.BottomSurface = Enum.SurfaceType.Smooth, Enum.SurfaceType.Smooth
-	p.Parent = m
-	return p
 end
 
 local function label(parent: Instance, text: string, height: number)
@@ -124,7 +112,9 @@ local function newItem()
 	root.CustomPhysicalProperties = NEKO_PHYSICS
 	m.Name = "NekoItem"
 	local _, size = m:GetBoundingBox()
-	return { Model = m, Root = root, Offset = m:GetPivot():ToObjectSpace(root.CFrame), Height = size.Y }
+	local it = { Model = m, Root = root, Offset = m:GetPivot():ToObjectSpace(root.CFrame), Height = size.Y }
+	itemByRoot[root] = it
+	return it
 end
 
 local function release(it)
@@ -220,21 +210,45 @@ local function makePad(pos: Vector3, name: string, kind: string, index: number, 
 	return m
 end
 
--- a neko-eared arch over the belt with a glowing panel the neko pass through
+local function plaqueText(p: BasePart?, face: Enum.NormalId, text: string)
+	if not p then return end
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = face
+	sg.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sg.PixelsPerStud = 120
+	sg.LightInfluence = 0
+	sg.Parent = p
+	local lbl = Instance.new("TextLabel")
+	lbl.BackgroundTransparency = 1
+	lbl.Size = UDim2.fromScale(1, 1)
+	lbl.Font = Enum.Font.FredokaOne
+	lbl.TextScaled = true
+	lbl.TextColor3 = Color3.fromRGB(120, 40, 30)
+	lbl.Text = text
+	lbl.Parent = sg
+end
+
+-- a clone of Assets.Dropper.UpgradePortal standing over the belt, wide enough that its posts are
+-- outside the belt; neko pass through its upgrade_field (the only part they touch)
 local function makeGate(i: number): Model
-	local ghost = false
 	local g = L.Gates[i]
-	local m = Instance.new("Model")
+	local m = portalAsset:Clone()
 	m.Name = "Gate" .. i
-	local floor = -DropperConfig.BeltHeight -- the gate's CFrame is at the belt top
-	local x = DropperConfig.BeltHalfWidth + 0.6
-	for _, s in ipairs({ -1, 1 }) do
-		part(m, "Post", Vector3.new(0.8, 7, 0.8), g.CFrame * CFrame.new(s * x, floor + 3.5, 0), CREAM, ghost)
-		part(m, "Ear", Vector3.new(1.4, 1.4, 0.6), g.CFrame * CFrame.new(s * x * 0.55, floor + 7.4, 0) * CFrame.Angles(0, 0, math.rad(45)), RED, ghost)
+	local field = m:FindFirstChild("upgrade_field", true) :: BasePart?
+	for _, d in ipairs(m:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanTouch, d.CanQuery = false, false
+		end
 	end
-	part(m, "Beam", Vector3.new(x * 2 + 0.8, 0.9, 0.9), g.CFrame * CFrame.new(0, floor + 7, 0), RED, ghost)
-	local panel = part(m, "Panel", Vector3.new(x * 2 - 0.8, 4.6, 0.15), g.CFrame * CFrame.new(0, 2.6, 0), GATE, ghost, true)
-	label(panel, "x" .. NumberFormat.Format(g.Mult), 4.5)
+	if field then
+		field.CanCollide, field.CanTouch = false, true
+		m:ScaleTo(m:GetScale() * (DropperConfig.BeltHalfWidth + 0.3) / (field.Size.X / 2))
+	end
+	ground(m, g.CFrame - Vector3.new(0, DropperConfig.BeltHeight, 0)) -- the gate's CFrame is at the belt top, facing along it
+	local text = "x" .. NumberFormat.Format(g.Mult)
+	plaqueText(m:FindFirstChild("plaque_face", true) :: BasePart?, Enum.NormalId.Back, text)
+	plaqueText(m:FindFirstChild("plaque_face_back", true) :: BasePart?, Enum.NormalId.Front, text)
 	m.Parent = folder
 	return m
 end
@@ -295,7 +309,7 @@ local function spawnItem(slot: number, speed: number, value: number)
 	if not L or not droppers[slot] then return end
 	local spot = L.Droppers[slot]
 	local it = table.remove(pool) or newItem()
-	it.Slot, it.Speed, it.Value, it.T0, it.LastD, it.Falling = slot, speed, value, os.clock(), spot.D, true
+	it.Slot, it.Speed, it.Value, it.T0, it.Falling, it.Passed = slot, speed, value, os.clock(), true, {}
 	local _, dir = L.At(spot.D)
 	local pos = spot.Spout - Vector3.new(0, it.Height + 0.1, 0) -- the model's pivot is at its bottom
 	it.Model.Parent = folder -- parent first: moving the root outside workspace would re-set the welds
@@ -306,11 +320,39 @@ local function spawnItem(slot: number, speed: number, value: number)
 	table.insert(items, it)
 end
 
-local function flash(i: number)
-	local panel = gates[i] and gates[i]:FindFirstChild("Panel") :: BasePart?
-	if not panel then return end
-	panel.Transparency = 0.1
-	TweenService:Create(panel, TweenInfo.new(0.35), { Transparency = 0.55 }):Play()
+-- the field glows brighter for a moment and sparkles where the neko went through
+local function glow(p: BasePart)
+	local base = p:GetAttribute("BaseTransparency")
+	if base == nil then
+		base = p.Transparency
+		p:SetAttribute("BaseTransparency", base)
+	end
+	p.Transparency = base * 0.4
+	TweenService:Create(p, TweenInfo.new(0.4), { Transparency = base }):Play()
+end
+
+local function pulse(gate: Model, field: BasePart, at: Vector3)
+	glow(field)
+	for _, b in ipairs(gate:GetDescendants()) do
+		if b.Name == "field_band" and b:IsA("BasePart") then glow(b) end
+	end
+	EffectsController.Burst(at, GATE, 8)
+end
+
+-- each neko inside an owned gate's upgrade_field gets that gate once (the server already counted
+-- the multiplier when it dropped; this is only the effect)
+local function checkGates()
+	for i, gate in pairs(gates) do
+		local field = gate:FindFirstChild("upgrade_field", true) :: BasePart?
+		if not field then continue end
+		for _, root in ipairs(workspace:GetPartsInPart(field, overlap)) do
+			local it = itemByRoot[root]
+			if it and not it.Falling and not it.Passed[i] then
+				it.Passed[i] = true
+				pulse(gate, field, root.Position)
+			end
+		end
+	end
 end
 
 local function sold(it)
@@ -341,10 +383,6 @@ local function step()
 			continue
 		end
 		local d = spot.D + (now - it.T0) * it.Speed
-		for gi, g in ipairs(L.Gates) do
-			if it.LastD < g.D and d >= g.D and player:GetAttribute(DropperConfig.GateAttribute(gi)) then flash(gi) end
-		end
-		it.LastD = d
 		if d >= L.Length then
 			sold(it)
 			release(it)
@@ -354,6 +392,7 @@ local function step()
 		local p, dir = L.At(d)
 		it.Root.CFrame = CFrame.lookAt(p, p + dir) * it.Offset
 	end
+	checkGates()
 end
 
 local function clearItems()
@@ -371,6 +410,8 @@ function DropperController.Init()
 		dropperAsset = assets:WaitForChild("SushiDropper") :: Model
 		nekoAsset = assets:WaitForChild("ManekiNeko") :: Model
 		padAsset = assets:WaitForChild("UpgradePad") :: Model
+		portalAsset = assets:WaitForChild("UpgradePortal") :: Model
+		overlap.FilterDescendantsInstances = { folder }
 		L = DropperConfig.Layout()
 		while not PhysicsService:IsCollisionGroupRegistered(DropperConfig.NekoGroup) do task.wait(0.25) end
 		refresh()
