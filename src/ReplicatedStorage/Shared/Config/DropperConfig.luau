@@ -3,8 +3,10 @@
 --   neko's value, and the Neko head at the end pays 🐱 Neko (value x NekoValue x NekoMultiplier).
 --   Neko is only spent on dropper things and is never reset (not by Prestige, Rebirth or Ascension).
 -- WHERE things go is not in this file: it comes from the marker parts in workspace.Map.NekoLayout
---   (BeltPath P1..Pn, DropperSlots Slot1.., UpgraderSlots Slot1.., Board), so the layout can be
+--   (BeltPath P1..Pn, DropperSlots Slot1.., UpgraderSlots Slot1..), so the layout can be
 --   rearranged in Studio. Layout() reads them (same result on server and client).
+--   The 🐱 Neko Upgrades board is NekoLayout.NekoUpgradesBoard itself: a part tagged UpgradeBoard
+--   (BoardType DropperUpgradesBoard, BobHeight) that BoardsController draws wherever it stands.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -122,7 +124,7 @@ local layout = nil
 
 -- Waits for workspace.Map.NekoLayout and the dropper model, then returns (cached):
 --   Pieces, Length, At(d), Droppers[i] = { Pivot, Spout, Land, D, Pad },
---   Gates[i] = { CFrame, D, Pad, Mult, Cost }, Board (CFrame), Markers (every marker part)
+--   Gates[i] = { CFrame, D, Pad, Mult, Cost }, Markers (every marker part)
 function DropperConfig.Layout()
 	if layout then return layout end
 	local root = workspace:WaitForChild("Map"):WaitForChild("NekoLayout")
@@ -193,9 +195,6 @@ function DropperConfig.Layout()
 		table.insert(L.Markers, m)
 	end
 
-	local board = root:WaitForChild("Board") :: BasePart
-	L.Board = board.CFrame
-	table.insert(L.Markers, board)
 	for _, p in ipairs(root.BeltPath:GetChildren()) do table.insert(L.Markers, p) end
 	layout = L
 	return L

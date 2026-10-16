@@ -1,7 +1,7 @@
 -- DropperService: the Sushi Restaurant's droppers (DropperConfig).
 --   Builds the shared machine at runtime from the markers in workspace.Map.NekoLayout
---   (DropperConfig.Layout): the U-shaped conveyor with rounded corners, the Neko head (SellCat)
---   at its end and the 🐱 Neko Upgrades board, and hides the markers.
+--   (DropperConfig.Layout): the U-shaped conveyor with rounded corners and the Neko head (SellCat)
+--   at its end, and hides the markers. (The 🐱 Neko Upgrades board is a tagged part in NekoLayout.)
 --   Each player's droppers and upgrader gates are private (DropperController draws them and the
 --   neko): while a player is in the Dropper zone, every owned dropper drops on a server timer,
 --   the server works out the neko's value (gates it will pass), tells that player's client
@@ -11,7 +11,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
 
 local DropperConfig = require(ReplicatedStorage.Shared.Config.DropperConfig)
@@ -41,24 +40,6 @@ local function remote(name: string): RemoteEvent
 end
 
 -- ===== the shared machine =====
-
-local CREAM = Color3.fromRGB(255, 243, 225)
-local RED = Color3.fromRGB(205, 70, 70)
-
-local function part(parent: Instance, name: string, size: Vector3, cf: CFrame, color: Color3, props: { [string]: any }?): Part
-	local p = Instance.new("Part")
-	p.Name = name
-	p.Anchored = true
-	p.Size = size
-	p.CFrame = cf
-	p.Color = color
-	p.Material = Enum.Material.SmoothPlastic
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	for k, v in pairs(props or {}) do (p :: any)[k] = v end
-	p.Parent = parent
-	return p
-end
 
 -- a clone of an imported model, every part anchored; marker parts (DropPoint, SellZone) hidden
 local function asset(folder: Instance?, name: string): Model?
@@ -142,23 +123,6 @@ local function buildMachine(L)
 		cat:PivotTo(CFrame.new(last.X - off.X, last.Y - DropperConfig.BeltHeight, last.Z - off.Z) * rot)
 		cat.Name = "SellCat"
 		cat.Parent = machine
-	end
-
-	-- 🐱 Neko Upgrades board on the Board marker (BoardsController draws it)
-	local boardCf = L.Board
-	local boardSize = Vector3.new(13.95, 8.8, 0.2) -- the 3-card canvas at 40 px per stud
-	local board = part(machine, "NekoUpgradesBoard", boardSize, boardCf, CREAM, { Transparency = 1, CanCollide = false })
-	board:SetAttribute("BoardType", "DropperUpgradesBoard")
-	CollectionService:AddTag(board, "UpgradeBoard")
-	part(machine, "BoardBacking", boardSize + Vector3.new(0.8, 0.8, 0.2), boardCf * CFrame.new(0, 0, 0.35), RED)
-	for _, x in ipairs({ -5, 5 }) do
-		part(machine, "BoardLeg", Vector3.new(0.8, 2.4, 0.8), boardCf * CFrame.new(x, -boardSize.Y / 2 - 1, 0.35), CREAM)
-	end
-	local neko = asset(folder, "ManekiNeko")
-	if neko then
-		local top = boardCf * CFrame.new(0, boardSize.Y / 2 + 0.4, 0.35)
-		neko:PivotTo(CFrame.lookAt(top.Position, top.Position + boardCf.LookVector))
-		neko.Parent = machine
 	end
 
 	machine.Parent = restaurant
