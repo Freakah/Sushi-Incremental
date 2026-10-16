@@ -234,7 +234,7 @@ local function refreshHeader()
 end
 
 local function build()
-	window = UIKit.Window({ Name = "Index", Title = "Index", Icon = "📖", Accent = ACCENT, Size = Vector2.new(900, 650) })
+	window = UIKit.Window({ Name = "Index", Title = "Index", Icon = UIKit.Icons.Index, Accent = ACCENT, Size = Vector2.new(900, 650) })
 	local body = window.Body
 
 	-- progress strip

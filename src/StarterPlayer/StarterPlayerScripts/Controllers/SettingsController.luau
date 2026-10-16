@@ -65,7 +65,7 @@ end
 -- ===== menu =====
 
 local function build()
-	window = UIKit.Window({ Name = "Settings", Title = "Settings", Icon = "⚙️", Size = Vector2.new(640, 720) })
+	window = UIKit.Window({ Name = "Settings", Title = "Settings", Icon = UIKit.Icons.Settings, Size = Vector2.new(640, 720) })
 	local list = UIKit.List(window.Body, 10)
 	for _, s in ipairs(SettingsConfig.List) do
 		local row = UIKit.Row(list, s.Icon, s.Name, s.Order)
