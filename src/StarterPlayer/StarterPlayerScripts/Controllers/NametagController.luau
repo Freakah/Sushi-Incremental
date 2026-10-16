@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- NametagController: animates rainbow titles on the "@Name [Title]" tags (the server builds
 -- them) and hides other players' tags when "Hide Other Players" is on.
 
@@ -58,7 +59,7 @@ function NametagController.Init()
 	RunService.RenderStepped:Connect(function()
 		local x = (os.clock() * 0.35) % 2 - 1
 		for g in pairs(gradients) do
-			if g.Parent then g.Offset = Vector2.new(x, 0) else gradients[g] = nil end
+			if g.Parent then g.Offset = Vector2.new(UIKit.ReducedMotion() and 0 or x, 0) else gradients[g] = nil end
 		end
 	end)
 end

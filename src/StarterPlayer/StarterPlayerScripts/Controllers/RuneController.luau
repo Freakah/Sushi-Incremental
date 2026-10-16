@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- RuneController: the 🔮 Rune Altars in the world (see RuneConfig / RuneService).
 --  * a very light circle on the ground shows where you have to stand to roll; it glows
 --    while you're inside it
@@ -19,7 +20,7 @@ local player = Players.LocalPlayer
 
 local RuneController = {}
 
-local CYAN = Color3.fromRGB(120, 230, 255)
+local CYAN = UIKit.Theme.Currency.Fish.Base
 local altars = {} -- { Area, Model, Center, Top, Stroke, Fill }
 local lastRollAt = 0
 
@@ -116,7 +117,7 @@ function RuneController.Init()
 				local off = root.Position - a.Center
 				inside = Vector3.new(off.X, 0, off.Z).Magnitude <= RuneConfig.AltarRadius and math.abs(off.Y) < 14
 			end
-			local wave = math.sin(t * 2.2) * 0.5 + 0.5
+			local wave = UIKit.ReducedMotion() and 0 or math.sin(t * 2.2) * 0.5 + 0.5
 			local flash = math.max(0, 1 - (t - lastRollAt) / 0.4)
 			a.Stroke.Transparency = if inside then 0.25 - flash * 0.2 else 0.5 + wave * 0.15
 			a.Fill.BackgroundTransparency = if inside then 0.86 - flash * 0.1 else 0.94

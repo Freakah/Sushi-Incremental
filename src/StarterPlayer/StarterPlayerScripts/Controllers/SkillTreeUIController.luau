@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- SkillTreeUIController: the Skill Tree menu (🌳 Skills button on the left of the HUD).
 --   * full-screen hex grid over a dimmed game, START in the middle, 6 branches around it
 --   * each hex: icon, short name, level pill (0/5); a price above the hexes you can buy next
@@ -10,21 +11,19 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local SkillTreeConfig = require(ReplicatedStorage.Shared.Config.SkillTreeConfig)
 local NumberFormat = require(ReplicatedStorage.Shared.Util.NumberFormat)
-local UIKit = require(script.Parent.UIKit)
 local MenuManager = require(script.Parent.MenuManager)
 local EffectsController = require(script.Parent.EffectsController)
 
 local player = Players.LocalPlayer
 local SkillTreeUIController = {}
 
-local C = Color3.fromRGB
 local SQRT3 = math.sqrt(3)
 local HEX_R = 58          -- drawn hex radius (centre -> corner), px
 local CELL_R = 80         -- layout radius (bigger = more gap between hexes)
@@ -36,7 +35,7 @@ local LINE_W = 22
 -- Uploaded art (rbxassetid). Empty = drawn fallback.
 --   Hex: the hexagon used for every skill.  Lines: the bar connecting skills, one per branch colour.
 local ART = {
-	Hex = "rbxassetid://99095451438093",
+	Hex = "",
 	Lines = {
 		Value = "rbxassetid://136357637342362",    -- pink
 		Cash = "rbxassetid://75676403358018",      -- green
@@ -51,7 +50,7 @@ local ART = {
 	IconCell = 146,
 	IconCols = 7,
 	-- hexagon frames: one 1024x1024 sheet, 3 per row in 341 px steps (340 px hexes)
-	HexSheet = "rbxassetid://75707322771550", -- SkillHexes_Sheet
+	HexSheet = "", -- SkillHexes_Sheet
 	HexStep = 341,
 	HexSize = 340,
 	HexIndex = { Spawn = 0, Capacity = 1, Luck = 2, Rebirth = 3, Value = 4, Cash = 5 }, -- blue, orange, purple, yellow, red, green
@@ -72,16 +71,16 @@ local ART = {
 }
 
 local COL = {
-	Fill = C(44, 48, 62),
-	FillLocked = C(30, 31, 38),
-	BorderLocked = C(58, 60, 70),
-	Maxed = C(255, 210, 70),
-	LineOff = C(70, 72, 84),
-	Afford = C(110, 255, 110),
-	NoAfford = C(255, 95, 95),
-	Text = C(255, 255, 255),
-	Dim = C(130, 132, 142),
-	PillBg = C(24, 25, 32),
+	Fill = UIKit.Theme.Colors.Rice.Dark,
+	FillLocked = UIKit.Theme.Colors.Rice.Dark,
+	BorderLocked = UIKit.Theme.Ink,
+	Maxed = UIKit.Theme.Colors.Primary.Base,
+	LineOff = UIKit.Theme.Colors.Rice.Dark,
+	Afford = UIKit.Theme.Colors.Success.Base,
+	NoAfford = UIKit.Theme.Colors.Danger.Base,
+	Text = UIKit.Theme.White,
+	Dim = UIKit.Theme.Muted,
+	PillBg = UIKit.Theme.Colors.Rice.Dark,
 }
 
 local gui: ScreenGui
@@ -144,13 +143,11 @@ for _, n in ipairs(SkillTreeConfig.List) do byPos[n.Q .. "," .. n.R] = n.Id end
 local function darker(c: Color3, f: number): Color3 return Color3.new(c.R * f, c.G * f, c.B * f) end
 local function branchColor(node): Color3
 	local b = SkillTreeConfig.BranchById[node.Branch]
-	return b and b.Color or C(200, 200, 200)
+	return b and b.Color or UIKit.Theme.Colors.Rice.Base
 end
 
 local function tween(obj, t: number, props, style, dir)
-	local tw = TweenService:Create(obj, TweenInfo.new(t, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out), props)
-	tw:Play()
-	return tw
+	return UIKit.Tween(obj, math.min(t,0.35), props, style, dir)
 end
 
 -- a pointy-top hexagon made of 3 rotated rectangles
@@ -179,7 +176,7 @@ local function hexImage(parent: Instance, radius: number, name: string, z: numbe
 	local img = UIKit.new("ImageLabel", {
 		Name = name, BackgroundTransparency = 1, Image = ART.Hex, ScaleType = Enum.ScaleType.Stretch,
 		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(radius * 2, radius * 2), ZIndex = z, ImageColor3 = color or C(255, 255, 255),
+		Size = UDim2.fromOffset(radius * 2, radius * 2), ZIndex = z, ImageColor3 = color or UIKit.Theme.White,
 	}, parent)
 	local api = { Holder = img, Image = true }
 	function api.SetColor(c: Color3) img.ImageColor3 = c end
@@ -221,7 +218,7 @@ end
 
 local function buildHex(root: Frame)
 	-- soft drop shadow, coloured glow (breathes), rim, the hex art, then the content
-	local shadow = hexImage(root, HEX_R + BORDER, "Shadow", 1, C(0, 0, 0))
+	local shadow = hexImage(root, HEX_R + BORDER, "Shadow", 1, UIKit.Theme.Ink)
 	shadow.Holder.Position = UDim2.new(0.5, 0, 0.5, 7)
 	shadow.SetTransparency(0.5)
 	local glow = hexShape(root, HEX_R + BORDER + 9, COL.Maxed, "Glow", 2)
@@ -229,7 +226,7 @@ local function buildHex(root: Frame)
 	local border = hexShape(root, HEX_R + BORDER, COL.BorderLocked, "Border", 3)
 	local fill = hexImage(root, HEX_R + 1, "Fill", 4)
 	-- shine: a white copy of the hex shape, only visible inside a moving diagonal band
-	local shine = hexImage(root, HEX_R + 1, "Shine", 5, C(255, 255, 255))
+	local shine = hexImage(root, HEX_R + 1, "Shine", 5, UIKit.Theme.White)
 	shine.SetTransparency(0.25)
 	local shineGrad = UIKit.new("UIGradient", {
 		Rotation = 25,
@@ -264,7 +261,7 @@ local function buildNodeView(node)
 
 	local icon = UIKit.Label(content, {
 		Name = "Icon", Text = node.Icon, AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.47), Size = UDim2.fromOffset(62, 62), ZIndex = 7,
+		Position = UDim2.fromScale(0.5, 0.47), Size = UIKit.Theme.Layout.SkillTreeUIController.Size1, ZIndex = 7,
 	}, 0)
 	local iconImg = iconImage(icon, 1)
 	-- name written over the picture (white with a dark outline)
@@ -282,24 +279,24 @@ local function buildNodeView(node)
 		VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder,
 	}, priceTag)
 	local priceText = UIKit.new("TextLabel", {
-		Name = "Amount", BackgroundTransparency = 1, LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UDim2.fromOffset(0, 22),
-		Font = UIKit.Font, TextSize = 17, TextColor3 = C(255, 255, 255), Text = "", ZIndex = 9,
+		Name = "Amount", BackgroundTransparency = 1, LayoutOrder = 2, AutomaticSize = Enum.AutomaticSize.X, Size = UIKit.Theme.Layout.SkillTreeUIController.Size2,
+		Font = UIKit.Font, TextSize = 17, TextColor3 = UIKit.Theme.White, Text = "", ZIndex = 9,
 	}, priceTag)
-	UIKit.Stroke(priceText, 2.2, C(20, 20, 26))
+	UIKit.Stroke(priceText, 2.2, UIKit.Theme.Ink)
 	-- level pill
 	local pill = UIKit.new("Frame", {
 		Name = "LevelPill", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, size * 0.42 + 32),
-		Size = UDim2.fromOffset(46, 20), BackgroundColor3 = COL.PillBg, BackgroundTransparency = 0.15, ZIndex = 7,
+		Size = UIKit.Theme.Layout.SkillTreeUIController.Size3, BackgroundColor3 = COL.PillBg, BackgroundTransparency = 0.15, ZIndex = 7,
 	}, content)
 	UIKit.Corner(pill, 10)
 	local pillStroke = UIKit.Stroke(pill, 2, COL.BorderLocked, true)
 	local level = UIKit.Label(pill, {
-		Name = "Level", Text = "0/" .. node.Max, Position = UDim2.fromOffset(4, 2), Size = UDim2.new(1, -8, 1, -4), ZIndex = 8,
+		Name = "Level", Text = "0/" .. node.Max, Position = UDim2.fromOffset(4, 2), Size = UIKit.Theme.Layout.SkillTreeUIController.Size4, ZIndex = 8,
 	}, 1.5)
 	local priceY = pos.Y - HEX_R - BORDER + 4
 	local price = UIKit.Label(world:FindFirstChild("Prices"), {
 		Name = node.Id, Text = "", AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.fromOffset(pos.X, priceY), Size = UDim2.fromOffset(104, 27), ZIndex = 3, Visible = false,
+		Position = UDim2.fromOffset(pos.X, priceY), Size = UIKit.Theme.Layout.SkillTreeUIController.Size5, ZIndex = 3, Visible = false,
 	}, 3)
 	views[node.Id] = {
 		Node = node, Root = root, Pop = pop, Pos = pos, Ring = ringOf(node.Q, node.R), Phase = math.random() * math.pi * 2,
@@ -319,12 +316,12 @@ local function buildStart()
 	local pop = UIKit.new("UIScale", { Name = "Pop" }, root)
 	local parts = buildHex(root)
 	if ART.HexSheet ~= "" and parts.Fill.SetHex then parts.Fill.SetHex(ART.HexStart) end
-	parts.Border.SetColor(C(255, 255, 255))
-	parts.Glow.SetColor(C(255, 255, 255))
-	if not parts.Fill.Image then parts.Fill.SetColor(C(60, 66, 86)) end
-	local icon = UIKit.Label(parts.Content, { Name = "Icon", Text = "🍣", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, size * 0.36), Size = UDim2.fromOffset(54, 50), ZIndex = 7 }, 0)
+	parts.Border.SetColor(UIKit.Theme.White)
+	parts.Glow.SetColor(UIKit.Theme.White)
+	if not parts.Fill.Image then parts.Fill.SetColor(UIKit.Theme.Colors.Rice.Dark) end
+	local icon = UIKit.Label(parts.Content, { Name = "Icon", Text = "🍣", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, size * 0.36), Size = UIKit.Theme.Layout.SkillTreeUIController.Size6, ZIndex = 7 }, 0)
 	setIcon(icon, iconImage(icon, 1), ART.StartArt, "🍣")
-	UIKit.Label(parts.Content, { Name = "Name", Text = "Start", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, size * 0.36 + 26), Size = UDim2.fromOffset(90, 30), ZIndex = 7 }, 3)
+	UIKit.Label(parts.Content, { Name = "Name", Text = "Start", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, size * 0.36 + 26), Size = UIKit.Theme.Layout.SkillTreeUIController.Size7, ZIndex = 7 }, 3)
 	startView = { Root = root, Pop = pop, Glow = parts.Glow, Content = parts.Content, Icon = icon, Ring = 0 }
 end
 
@@ -335,7 +332,7 @@ local function buildLines()
 			local from = if p == "START" then Vector2.zero else hexToPixel(SkillTreeConfig.ById[p].Q, SkillTreeConfig.ById[p].R)
 			local to = hexToPixel(node.Q, node.R)
 			local d = to - from
-			local art = ART.Lines[node.Branch] or ""
+			local art = "" -- Connections use the shared code-built theme
 			local props = {
 				Name = (p .. ">" .. node.Id), BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromOffset((from.X + to.X) / 2, (from.Y + to.Y) / 2),
@@ -357,7 +354,7 @@ local function buildLines()
 			-- energy that flows from the unlocked skill toward the next one
 			local spark = UIKit.new("Frame", {
 				Name = "Spark", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0, 0.42),
-				Size = UDim2.fromOffset(28, LINE_W * 0.3), BackgroundColor3 = C(255, 255, 255), BackgroundTransparency = 1,
+				Size = UDim2.fromOffset(28, LINE_W * 0.3), BackgroundColor3 = UIKit.Theme.White, BackgroundTransparency = 1,
 				BorderSizePixel = 0, ZIndex = 2,
 			}, f)
 			UIKit.Corner(spark, 6)
@@ -434,7 +431,7 @@ local function refresh()
 			v.Name.TextColor3 = COL.Text
 			v.Border.SetColor(COL.Maxed)
 			v.Glow.SetColor(COL.Maxed)
-			v.Fill.SetColor(if v.Fill.Image then C(255, 255, 255) else darker(bc, 0.42))
+			v.Fill.SetColor(if v.Fill.Image then UIKit.Theme.White else darker(bc, 0.42))
 			v.Icon.TextTransparency, v.Name.TextTransparency, v.Level.TextTransparency = 0, 0, 0
 			v.Level.TextColor3 = COL.Maxed
 			v.PillStroke.Color = COL.Maxed
@@ -446,9 +443,9 @@ local function refresh()
 			v.Border.SetColor(bc)
 			v.Glow.SetColor(bc)
 			-- 0 levels: the branch colour, but calmer; it brightens once you own a level
-			v.Fill.SetColor(if v.Fill.Image then (if lvl > 0 or ART.HexSheet ~= "" then C(255, 255, 255) else C(178, 178, 190)) elseif lvl > 0 then darker(bc, 0.32) else COL.Fill)
+			v.Fill.SetColor(if v.Fill.Image then (if lvl > 0 or ART.HexSheet ~= "" then UIKit.Theme.White else UIKit.Theme.Colors.Rice.Base) elseif lvl > 0 then darker(bc, 0.32) else COL.Fill)
 			v.Icon.TextTransparency, v.Name.TextTransparency, v.Level.TextTransparency = 0, 0, 0
-			v.Level.TextColor3 = if lvl > 0 then bc:Lerp(C(255, 255, 255), 0.45) else COL.Text
+			v.Level.TextColor3 = if lvl > 0 then bc:Lerp(UIKit.Theme.White, 0.45) else COL.Text
 			v.PillStroke.Color = bc
 			v.Price.Text = NumberFormat.Cash(cost)
 			v.Price.TextColor3 = if v.Affordable then COL.Afford else COL.NoAfford
@@ -456,9 +453,9 @@ local function refresh()
 		else
 			v.Border.SetColor(COL.BorderLocked)
 			v.Glow.SetTransparency(1)
-			v.Fill.SetColor(if v.Fill.Image then (if ART.HexSheet ~= "" then C(255, 255, 255) else C(72, 70, 88)) else COL.FillLocked)
+			v.Fill.SetColor(if v.Fill.Image then (if ART.HexSheet ~= "" then UIKit.Theme.White else UIKit.Theme.Colors.Rice.Dark) else COL.FillLocked)
 			v.Icon.TextTransparency, v.Name.TextTransparency, v.Level.TextTransparency = 0.3, 0.25, 0.45
-			v.Name.TextColor3 = C(170, 160, 200)
+			v.Name.TextColor3 = UIKit.Theme.Currency.Fish.Base
 			v.Level.TextColor3 = COL.Dim
 			v.PillStroke.Color = COL.BorderLocked
 			v.Price.Visible = false
@@ -468,7 +465,7 @@ local function refresh()
 	for _, v in pairs(views) do
 		v.PriceTag.Visible = v.Price.Visible
 		v.PriceText.Text = v.Price.Text
-		v.PriceText.TextColor3 = if v.Affordable then C(255, 255, 255) else C(255, 140, 140)
+		v.PriceText.TextColor3 = if v.Affordable then UIKit.Theme.White else UIKit.Theme.Colors.Primary.Base
 		v.Price.Visible = false
 	end
 	-- the cheapest skill you can afford right now gets the bouncing arrow
@@ -487,7 +484,7 @@ local function refresh()
 		l.Frame.Visible = fromShown and views[l.To] and views[l.To].Vis ~= "Gone" or false
 		if l.Image then
 			-- the branch's coloured bar; greyed out until the skill before it is maxed
-			l.Frame.ImageColor3 = if lit then C(255, 255, 255) else C(80, 80, 88)
+			l.Frame.ImageColor3 = if lit then UIKit.Theme.White else UIKit.Theme.Colors.Rice.Dark
 		else
 			l.Frame.BackgroundColor3 = if lit then branchColor(SkillTreeConfig.ById[l.To]) else COL.LineOff
 		end
@@ -649,6 +646,7 @@ end
 local fxLayer: Frame
 
 local function shake(v)
+	if UIKit.ReducedMotion() then UIKit.Sound("Error"); return end
 	local base = UDim2.fromOffset(v.Pos.X, v.Pos.Y)
 	task.spawn(function()
 		for i = 1, 7 do
@@ -694,7 +692,7 @@ local function burst(pos: Vector2, color: Color3, big: boolean?)
 		local dist = (if big then 120 else 85) + math.random() * 30
 		local s = UIKit.Label(fxLayer, {
 			Text = if big and i % 2 == 0 then "⭐" else "✨", AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromOffset(pos.X, pos.Y), Size = UDim2.fromOffset(26, 26), ZIndex = 21, Rotation = math.random(-30, 30),
+			Position = UDim2.fromOffset(pos.X, pos.Y), Size = UIKit.Theme.Layout.SkillTreeUIController.Size8, ZIndex = 21, Rotation = math.random(-30, 30),
 		}, 0)
 		tween(s, 0.55, { Position = UDim2.fromOffset(pos.X + math.cos(a) * dist, pos.Y + math.sin(a) * dist), Rotation = math.random(-120, 120) }, Enum.EasingStyle.Quart)
 		task.delay(0.3, function() tween(s, 0.3, { TextTransparency = 1 }) end)
@@ -713,7 +711,7 @@ local function popNode(v, maxed: boolean)
 	bounce(v, if maxed then 1.35 else 1.22, if maxed then 0.6 else 0.45, Enum.EasingStyle.Elastic)
 	burst(v.Pos, if maxed then COL.Maxed else branchColor(v.Node), maxed)
 	local lvl = levelOf(v.Node.Id)
-	floatText(v.Pos, if v.Node.Max == 1 then "UNLOCKED!" elseif maxed then "MAXED!" else ("Lv " .. lvl), if maxed then COL.Maxed else branchColor(v.Node):Lerp(C(255, 255, 255), 0.35), maxed)
+	floatText(v.Pos, if v.Node.Max == 1 then "UNLOCKED!" elseif maxed then "MAXED!" else ("Lv " .. lvl), if maxed then COL.Maxed else branchColor(v.Node):Lerp(UIKit.Theme.White, 0.35), maxed)
 	if maxed then
 		-- the lines leaving this skill grow out one after another and wake up the next skills
 		local n = 0
@@ -811,6 +809,7 @@ end
 function SkillTreeUIController.Open()
 	if isOpen then return end
 	MenuManager.Opening("SkillTreeUI")
+	UIKit.MenuEffect("SkillTreeUI",true)
 	isOpen = true
 	openedAt = os.clock()
 	gui.Enabled = true
@@ -828,7 +827,7 @@ function SkillTreeUIController.Open()
 	tween(exit, 0.45, { Position = UDim2.new(0.5, 0, 1, -18) }, Enum.EasingStyle.Back)
 	introAnimation()
 	if lastInput == "gamepad" then
-		selectedId = selectedId or "VAL1"
+		selectedId = selectedId or SkillTreeConfig.List[1].Id
 		showTooltip(selectedId)
 	end
 end
@@ -836,6 +835,8 @@ end
 function SkillTreeUIController.Close()
 	if not isOpen then return end
 	isOpen = false
+	MenuManager.Closed("SkillTreeUI")
+	UIKit.MenuEffect("SkillTreeUI",false)
 	hoveredId, selectedId = nil, nil
 	tooltip.Visible = false
 	tipShownId = nil
@@ -863,6 +864,14 @@ end
 local press: any = nil -- { Input, Start, Pan, Dragged, NodeId, Held }
 
 local function animate(dt: number)
+	if UIKit.ReducedMotion() then
+		startView.Glow.SetTransparency(1);startView.Icon.Rotation=0
+		for id,v in pairs(views) do v.Root.Rotation=0;v.Icon.Rotation=0;v.Content.Position=UDim2.new();v.Shine.Visible=false;v.Glow.SetTransparency(id==selectedId and 0.35 or 1);if os.clock()>v.PopUntil then v.Pop.Scale=1 end end
+		for _,p in ipairs(ambience.Petals or {}) do p.Label.Visible=false end
+		for _,l in ipairs(lines) do l.Spark.BackgroundTransparency=1 end
+		recommend.Visible=false;return
+	end
+	for _,p in ipairs(ambience.Petals or {}) do p.Label.Visible=true end
 	local t = os.clock()
 	local intro = t - openedAt < 0.9
 	-- Start: slow breathing glow
@@ -1082,7 +1091,7 @@ function SkillTreeUIController.Init()
 	-- the dimmed game behind
 	UIKit.new("Frame", {
 		Name = "Backdrop", Size = UDim2.fromScale(1, 1), Active = true,
-		BackgroundColor3 = C(8, 10, 18), BackgroundTransparency = 0.25, ZIndex = 1,
+		BackgroundColor3 = UIKit.Theme.Colors.Rice.Dark, BackgroundTransparency = 0.25, ZIndex = 1,
 	}, gui)
 
 	-- drifting sakura petals behind the tree (screen space)
@@ -1098,7 +1107,7 @@ function SkillTreeUIController.Init()
 		})
 	end
 	local view = UIKit.new("Frame", { Name = "View", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 3, ClipsDescendants = true }, gui)
-	world = UIKit.new("Frame", { Name = "World", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(0, 0), ZIndex = 2 }, view)
+	world = UIKit.new("Frame", { Name = "World", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UIKit.Theme.Layout.SkillTreeUIController.Size9, ZIndex = 2 }, view)
 	zoomScale = UIKit.new("UIScale", {}, world)
 	-- invisible layer over the tree that takes drag / zoom / clicks (hexes are hit-tested by maths)
 	local catcher = UIKit.new("TextButton", {
@@ -1107,24 +1116,24 @@ function SkillTreeUIController.Init()
 	catcher:SetAttribute("NoSound", true)
 	-- layers: lines under the hexes, prices above them, effects on top
 	-- soft warm glow behind Start (moves/zooms with the tree)
-	local amb = UIKit.new("Frame", { Name = "Ambience", BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0), ZIndex = 0 }, world)
-	UIKit.new("Frame", { Name = "Lines", BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0), ZIndex = 1 }, world)
-	UIKit.new("Frame", { Name = "Nodes", BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0), ZIndex = 2 }, world)
-	UIKit.new("Frame", { Name = "Prices", BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0), ZIndex = 3 }, world)
-	fxLayer = UIKit.new("Frame", { Name = "FX", BackgroundTransparency = 1, Size = UDim2.fromOffset(0, 0), ZIndex = 4 }, world)
+	local amb = UIKit.new("Frame", { Name = "Ambience", BackgroundTransparency = 1, Size = UIKit.Theme.Layout.SkillTreeUIController.Size10, ZIndex = 0 }, world)
+	UIKit.new("Frame", { Name = "Lines", BackgroundTransparency = 1, Size = UIKit.Theme.Layout.SkillTreeUIController.Size11, ZIndex = 1 }, world)
+	UIKit.new("Frame", { Name = "Nodes", BackgroundTransparency = 1, Size = UIKit.Theme.Layout.SkillTreeUIController.Size12, ZIndex = 2 }, world)
+	UIKit.new("Frame", { Name = "Prices", BackgroundTransparency = 1, Size = UIKit.Theme.Layout.SkillTreeUIController.Size13, ZIndex = 3 }, world)
+	fxLayer = UIKit.new("Frame", { Name = "FX", BackgroundTransparency = 1, Size = UIKit.Theme.Layout.SkillTreeUIController.Size14, ZIndex = 4 }, world)
 
 	buildLines()
 	buildStart()
 	for _, node in ipairs(SkillTreeConfig.List) do buildNodeView(node) end
 	recommend = UIKit.Label(world:FindFirstChild("Prices"), {
 		Name = "Recommend", Text = "▼", TextColor3 = COL.Afford, AnchorPoint = Vector2.new(0.5, 1),
-		Size = UDim2.fromOffset(30, 26), ZIndex = 3, Visible = false,
+		Size = UIKit.Theme.Layout.SkillTreeUIController.Size15, ZIndex = 3, Visible = false,
 	}, 3)
 
 	-- soft dark strips behind the header and the Exit button so they read over the tree
 	for _, top in ipairs({ false }) do
 		local strip = UIKit.new("Frame", {
-			Name = if top then "TopShade" else "BottomShade", BorderSizePixel = 0, BackgroundColor3 = C(8, 10, 18),
+			Name = if top then "TopShade" else "BottomShade", BorderSizePixel = 0, BackgroundColor3 = UIKit.Theme.Ink,
 			AnchorPoint = Vector2.new(0, if top then 0 else 1), Position = UDim2.fromScale(0, if top then 0 else 1),
 			Size = UDim2.new(1, 0, 0, if top then 96 else 110), ZIndex = 4, -- under the input layer
 		}, gui)
@@ -1135,36 +1144,36 @@ function SkillTreeUIController.Init()
 	end
 
 	-- header (empty: the title was removed, kept so the layout code stays simple)
-	local header = UIKit.new("Frame", { Name = "Header", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UDim2.fromOffset(520, 60), ZIndex = 10 }, gui)
+	local header = UIKit.new("Frame", { Name = "Header", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 14), Size = UIKit.Theme.Layout.SkillTreeUIController.Size16, ZIndex = 10 }, gui)
 	local headerScale = UIKit.new("UIScale", {}, header)
 
 	-- tooltip (bottom, above Exit)
 	tooltip = UIKit.new("Frame", {
-		Name = "Tooltip", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -104), Size = UDim2.fromOffset(560, 128),
-		BackgroundColor3 = C(255, 255, 255), BackgroundTransparency = 0, Visible = false, ZIndex = 10,
+		Name = "Tooltip", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -104), Size = UIKit.Theme.Layout.SkillTreeUIController.Size17,
+		BackgroundColor3 = UIKit.Theme.Colors.Secondary.Base, BackgroundTransparency = 0, Visible = false, ZIndex = 10,
 	}, gui)
 	UIKit.Corner(tooltip, 24)
-	UIKit.Stroke(tooltip, 5, C(17, 17, 17), true)
+	UIKit.Stroke(tooltip, 5, UIKit.Theme.Ink, true)
 	tipScale = UIKit.new("UIScale", {}, tooltip)
 	-- nigiri sitting on the top-right corner
 	UIKit.new("ImageLabel", {
 		Name = "Sushi", Image = "rbxassetid://135530546062071", BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -18, 0, 4), Size = UDim2.fromOffset(68, 46), ZIndex = 12,
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -18, 0, 4), Size = UIKit.Theme.Layout.SkillTreeUIController.Size18, ZIndex = 12,
 	}, tooltip)
 	-- rows are stacked by layoutTooltip(), so only their heights matter here
-	tipTitle = UIKit.Label(tooltip, { Name = "Title", Text = "", Size = UDim2.new(1, -32, 0, 40), ZIndex = 11, TextColor3 = C(255, 255, 255) }, 3)
-	tipDesc = UIKit.Label(tooltip, { Name = "Desc", Text = "", Size = UDim2.new(1, -32, 0, 28), ZIndex = 11, TextColor3 = UIKit.Colors.Subtle }, 2)
-	tipAction = UIKit.Label(tooltip, { Name = "Action", Text = "", Size = UDim2.new(1, -32, 0, 38), ZIndex = 11 }, 3)
+	tipTitle = UIKit.Label(tooltip, { Name = "Title", Text = "", Size = UIKit.Theme.Layout.SkillTreeUIController.Size19, ZIndex = 11, TextColor3 = UIKit.Theme.White }, 3)
+	tipDesc = UIKit.Label(tooltip, { Name = "Desc", Text = "", Size = UIKit.Theme.Layout.SkillTreeUIController.Size20, ZIndex = 11, TextColor3 = UIKit.Colors.Subtle }, 2)
+	tipAction = UIKit.Label(tooltip, { Name = "Action", Text = "", Size = UIKit.Theme.Layout.SkillTreeUIController.Size21, ZIndex = 11 }, 3)
 
 	-- big red Exit
 	local exit = UIKit.Button(gui, {
 		Name = "Exit", Label = "Exit", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -18),
-		Size = UDim2.fromOffset(250, 74), Colors = UIKit.Gradients.Off, StrokeColor = C(90, 10, 14), ZIndex = 12,
+		Size = UIKit.Theme.Layout.SkillTreeUIController.Size22, Colors = UIKit.Gradients.Off, StrokeColor = UIKit.Theme.Colors.Danger.Base, ZIndex = 12,
 	}, function() SkillTreeUIController.Close() end)
 	exit.Label.ZIndex = 13
 	local hint = UIKit.Label(gui, {
 		Name = "Hint", Text = "", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -18, 1, -18),
-		Size = UDim2.fromOffset(470, 22), ZIndex = 10, TextColor3 = C(190, 192, 202), TextXAlignment = Enum.TextXAlignment.Right,
+		Size = UIKit.Theme.Layout.SkillTreeUIController.Size23, ZIndex = 10, TextColor3 = UIKit.Theme.Muted, TextXAlignment = Enum.TextXAlignment.Right,
 	}, 2)
 
 	local function rescale()

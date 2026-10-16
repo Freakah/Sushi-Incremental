@@ -1,8 +1,9 @@
+local UIKit = require(script.Parent.UIKit)
 -- EffectsController: reusable feedback effects (sounds, particle bursts, floating text).
 
 local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -68,7 +69,7 @@ function EffectsController.Burst(position: Vector3, color: Color3, amount: numbe
 
 	local pe = Instance.new("ParticleEmitter")
 	pe.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-	pe.Color = ColorSequence.new(color, Color3.new(1, 1, 1))
+	pe.Color = ColorSequence.new(color, UIKit.Theme.White)
 	pe.LightEmission = 0.6
 	pe.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0) })
 	pe.Lifetime = NumberRange.new(0.35, 0.6)
@@ -99,21 +100,21 @@ function EffectsController.FloatingText(position: Vector3, text: string, color: 
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 1)
-	label.Font = Enum.Font.FredokaOne
+	label.Font = UIKit.Font
 	label.TextScaled = true
 	label.Text = text
 	label.TextColor3 = color
 	label.Parent = bb
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 2.5
-	stroke.Color = Color3.fromRGB(25, 20, 35)
+	stroke.Color = UIKit.Theme.Ink
 	stroke.Parent = label
 	local scale = Instance.new("UIScale")
 	scale.Scale = 0.4
 	scale.Parent = label
 
 	TweenService:Create(scale, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
-	TweenService:Create(bb, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { StudsOffset = Vector3.new(0, 4.2, 0) }):Play()
+	TweenService:Create(bb, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { StudsOffset = Vector3.new(0, 4.2, 0) }):Play()
 	local fade = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, 0.5)
 	TweenService:Create(label, fade, { TextTransparency = 1 }):Play()
 	TweenService:Create(stroke, fade, { Transparency = 1 }):Play()
@@ -126,7 +127,7 @@ local punchActive = false
 function EffectsController.CameraPunch(amount: number)
 	local cam = workspace.CurrentCamera
 	if not cam or punchActive then return end
-	if not require(script.Parent.SettingsState).Get("CameraShake") then return end
+	if UIKit.ReducedMotion() or not require(script.Parent.SettingsState).Get("CameraShake") then return end
 	punchActive = true
 	local base = cam.FieldOfView
 	local out = TweenService:Create(cam, TweenInfo.new(0.07, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { FieldOfView = base + amount })

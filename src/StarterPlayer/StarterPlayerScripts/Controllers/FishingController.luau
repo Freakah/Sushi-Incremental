@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- FishingController: the Fishing Pad in the Sushi Pond. The pad breathes gently, and
 -- "+N 🐟" pops up while you catch (the server does the catching).
 -- The pop-up and sound only play while you're in the Sushi Pond (Auto Fish keeps
@@ -16,8 +17,8 @@ local player = Players.LocalPlayer
 
 local FishingController = {}
 
-local FISH = Color3.fromRGB(110, 200, 255)
-local GOLD = Color3.fromRGB(255, 210, 60)
+local FISH = UIKit.Theme.Currency.Fish.Base
+local GOLD = UIKit.Theme.Colors.Primary.Base
 local POP_EVERY = 0.35 -- fast catches are added up into one pop-up
 
 local function animatePad(pad: BasePart)

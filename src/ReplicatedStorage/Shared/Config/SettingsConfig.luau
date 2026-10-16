@@ -4,6 +4,7 @@
 local SettingsConfig = {}
 
 SettingsConfig.List = {
+	{ Key = "ReduceMotion", Name = "Reduce Motion", Icon = "◉", Kind = "Toggle", Default = false },
 	{ Key = "Music", Name = "Music", Icon = "🎵", Kind = "Toggle", Default = true },
 	{ Key = "SFX", Name = "SFX", Icon = "🔊", Kind = "Toggle", Default = true },
 	{ Key = "Volume", Name = "Volume", Icon = "🎚️", Kind = "Slider", Default = 0.8 },

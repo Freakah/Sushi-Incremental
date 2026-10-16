@@ -1,9 +1,10 @@
+local UIKit = require(script.Parent.UIKit)
 -- MarketController: the Sushi Market sell panel, sell feedback, the stall's live
 -- rate screen, the lucky cat, and the beginner guide trail to the market.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 local CollectionService = game:GetService("CollectionService")
@@ -21,9 +22,9 @@ local player = Players.LocalPlayer
 
 local MarketController = {}
 
-local YELLOW = Color3.fromRGB(255, 220, 60)
-local GREEN = Color3.fromRGB(110, 255, 110)
-local DARK = Color3.fromRGB(30, 30, 38)
+local YELLOW = UIKit.Theme.Colors.Accent.Base
+local GREEN = UIKit.Theme.Colors.Success.Base
+local DARK = UIKit.Theme.Ink
 local SELL_ACTION = "SushiMarketSell"
 
 local market: Model
@@ -52,7 +53,7 @@ local function label(parent, name, text, y, h, color, rich)
 	t.BackgroundTransparency = 1
 	t.Position = UDim2.new(0, 12, 0, y)
 	t.Size = UDim2.new(1, -24, 0, h)
-	t.Font = Enum.Font.FredokaOne
+	t.Font = UIKit.Font
 	t.TextScaled = true
 	t.RichText = rich or false
 	t.Text = text
@@ -81,9 +82,9 @@ local function refresh()
 	local rate = player:GetAttribute("SellRate") or EconomyConfig.GetSellRate(1)
 	local canSell = kg > 0
 	ui.ButtonGradient.Color = canSell
-		and ColorSequence.new(Color3.fromRGB(255, 236, 96), Color3.fromRGB(255, 184, 40))
-		or ColorSequence.new(Color3.fromRGB(196, 196, 204), Color3.fromRGB(146, 146, 156))
-	local edge = canSell and Color3.fromRGB(128, 76, 6) or Color3.fromRGB(80, 80, 92)
+		and ColorSequence.new(UIKit.Theme.Colors.Accent.Base, UIKit.Theme.Colors.Primary.Base)
+		or ColorSequence.new(UIKit.Theme.Colors.Rice.Base, UIKit.Theme.Colors.Rice.Base)
+	local edge = canSell and UIKit.Theme.Colors.Danger.Base or UIKit.Theme.Colors.Rice.Base
 	ui.ButtonStroke.Color = edge
 	ui.TitleStroke.Color = edge
 	ui.SubStroke.Color = edge
@@ -119,7 +120,7 @@ local function buildPanel()
 	panel.BackgroundTransparency = 1
 	panel.AnchorPoint = Vector2.new(0.5, 1)
 	panel.Position = UDim2.new(0.5, 0, 1, -26)
-	panel.Size = UDim2.fromOffset(250, 66)
+	panel.Size = UIKit.Theme.Layout.MarketController.Size1
 	panel.Parent = gui
 	panelScale = Instance.new("UIScale")
 	panelScale.Parent = panel
@@ -127,7 +128,7 @@ local function buildPanel()
 	local button = Instance.new("TextButton")
 	button.Name = "SellButton"
 	button.Size = UDim2.fromScale(1, 1)
-	button.BackgroundColor3 = Color3.new(1, 1, 1)
+	button.BackgroundColor3 = UIKit.Theme.White
 	button.AutoButtonColor = false
 	button.Text = ""
 	button.Parent = panel
@@ -141,11 +142,11 @@ local function buildPanel()
 	ui.ButtonScale.Parent = button
 	-- soft highlight on the top half
 	local shine = Instance.new("Frame")
-	shine.BackgroundColor3 = Color3.new(1, 1, 1)
+	shine.BackgroundColor3 = UIKit.Theme.White
 	shine.BackgroundTransparency = 0.72
 	shine.BorderSizePixel = 0
 	shine.Position = UDim2.new(0, 16, 0, 5)
-	shine.Size = UDim2.new(1, -32, 0.34, 0)
+	shine.Size = UIKit.Theme.Layout.MarketController.Size2
 	shine.Parent = button
 	Instance.new("UICorner", shine).CornerRadius = UDim.new(1, 0)
 
@@ -154,43 +155,48 @@ local function buildPanel()
 	key.Name = "Key"
 	key.AnchorPoint = Vector2.new(0, 0.5)
 	key.Position = UDim2.new(0, 14, 0.5, 0)
-	key.Size = UDim2.fromOffset(34, 34)
-	key.BackgroundColor3 = Color3.fromRGB(46, 36, 52)
+	key.Size = UIKit.Theme.Layout.MarketController.Size3
+	key.BackgroundColor3 = UIKit.Theme.Colors.Rice.Dark
 	key.Parent = button
 	Instance.new("UICorner", key).CornerRadius = UDim.new(0, 9)
 	local keyText = Instance.new("TextLabel")
 	keyText.BackgroundTransparency = 1
 	keyText.Size = UDim2.fromScale(1, 1)
-	keyText.Font = Enum.Font.FredokaOne
+	keyText.Font = UIKit.Font
 	keyText.TextSize = 22
-	keyText.TextColor3 = Color3.new(1, 1, 1)
+	keyText.TextColor3 = UIKit.Theme.White
 	keyText.Parent = key
 	ui.Key, ui.KeyText = key, keyText
 
 	local texts = Instance.new("Frame")
 	texts.BackgroundTransparency = 1
+	texts.ZIndex=6
 	texts.Position = UDim2.new(0, 56, 0, 6)
-	texts.Size = UDim2.new(1, -72, 1, -12)
+	texts.Size = UIKit.Theme.Layout.MarketController.Size4
 	texts.Parent = button
 	local title = Instance.new("TextLabel")
 	title.BackgroundTransparency = 1
-	title.Size = UDim2.new(1, 0, 0.58, 0)
-	title.Font = Enum.Font.FredokaOne
+	title.Size = UIKit.Theme.Layout.MarketController.Size5
+	title.Font = UIKit.Font
 	title.TextScaled = true
-	title.TextColor3 = Color3.new(1, 1, 1)
+	title.TextColor3 = UIKit.Theme.White
 	title.Parent = texts
 	ui.TitleStroke = stroke(title, 2.5)
 	local sub = Instance.new("TextLabel")
 	sub.BackgroundTransparency = 1
 	sub.Position = UDim2.fromScale(0, 0.6)
-	sub.Size = UDim2.new(1, 0, 0.4, 0)
-	sub.Font = Enum.Font.FredokaOne
+	sub.Size = UIKit.Theme.Layout.MarketController.Size6
+	sub.Font = UIKit.Font
 	sub.TextScaled = true
-	sub.TextColor3 = Color3.new(1, 1, 1)
+	sub.TextColor3 = UIKit.Theme.White
 	sub.Parent = texts
 	ui.SubStroke = stroke(sub, 2)
 	ui.Title, ui.Sub = title, sub
 	ui.Button = button
+	UIKit.StyleButton(button,"Success")
+	button.ButtonFace:GetPropertyChangedSignal("AbsoluteSize"):Connect(function() end)
+	ui.Title.ZIndex=6;ui.Sub.ZIndex=6;key.ZIndex=6;keyText.ZIndex=7;shine.Visible=false
+	ui.ButtonGradient:GetPropertyChangedSignal("Color"):Connect(function() button.ButtonFace:FindFirstChildOfClass("UIGradient").Color=ui.ButtonGradient.Color end)
 
 	button.Activated:Connect(function()
 		MarketController.Sell()
@@ -242,6 +248,7 @@ end
 local lastRequest = 0
 function MarketController.Sell()
 	if (player:GetAttribute("KG") or 0) <= 0 then
+		if UIKit.ReducedMotion() then UIKit.Sound("Error"); return end
 		-- gentle "nope" shake
 		local p = ui.Button.Position
 		for _, dx in ipairs({ -6, 6, -4, 4, 0 }) do
@@ -269,7 +276,7 @@ local function flyCashToHud(count: number)
 		local note = Instance.new("TextLabel")
 		note.BackgroundTransparency = 1
 		note.AnchorPoint = Vector2.new(0.5, 0.5)
-		note.Size = UDim2.fromOffset(40, 40)
+		note.Size = UIKit.Theme.Layout.MarketController.Size7
 		note.TextScaled = true
 		note.Text = "💵"
 		note.Rotation = math.random(-30, 30)
@@ -281,7 +288,7 @@ local function flyCashToHud(count: number)
 			local tw = TweenService:Create(note, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
 				Position = UDim2.fromOffset(target.X, target.Y),
 				Rotation = 0,
-				Size = UDim2.fromOffset(26, 26),
+				Size = UIKit.Theme.Layout.MarketController.Size8,
 			})
 			tw:Play()
 		end)
@@ -295,10 +302,10 @@ local function onSold(kg: number, cash: number, bonus: boolean?)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	if root then
-		EffectsController.FloatingText(root.Position + Vector3.new(0, 3, 0), (bonus and "🤝 x2 DEAL! +" or "+") .. NumberFormat.Cash(cash), bonus and Color3.fromRGB(255, 215, 60) or GREEN, true)
+		EffectsController.FloatingText(root.Position + Vector3.new(0, 3, 0), (bonus and "🤝 x2 DEAL! +" or "+") .. NumberFormat.Cash(cash), bonus and UIKit.Theme.Colors.Accent.Base or GREEN, true)
 		if bonus then EffectsController.CameraPunch(3) end
 	end
-	EffectsController.Burst(sellZone.Position + Vector3.new(0, 2, 0), Color3.fromRGB(255, 215, 60), 30)
+	EffectsController.Burst(sellZone.Position + Vector3.new(0, 2, 0), UIKit.Theme.Colors.Accent.Base, 30)
 	gui.Enabled = true -- fly-in notes live on this gui
 	flyCashToHud(math.clamp(math.floor(cash / 25) + 4, 4, 12))
 	catWaveUntil = os.clock() + 1.5
@@ -330,7 +337,7 @@ local function buildTrail()
 			p.CanTouch = false
 			p.CastShadow = false
 			p.Material = Enum.Material.Neon
-			p.Color = Color3.new(1, 1, 1)
+			p.Color = UIKit.Theme.White
 			p.Size = Vector3.new(0.35, 0.12, 1.3)
 			p.Transparency = 1
 			p.Parent = trailFolder

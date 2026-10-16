@@ -1,114 +1,38 @@
--- ProfileController: the Profile menu (like the reference): name + avatar on the left,
--- lifetime stats on the right.
-
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local NumberFormat = require(ReplicatedStorage.Shared.Util.NumberFormat)
-local TitleConfig = require(ReplicatedStorage.Shared.Config.TitleConfig)
-local SkillTreeConfig = require(ReplicatedStorage.Shared.Config.SkillTreeConfig)
-local SushiCatalog = require(ReplicatedStorage.Shared.Config.SushiCatalog)
-local UIKit = require(script.Parent.UIKit)
-
-local player = Players.LocalPlayer
-local ProfileController = {}
-
-local C = Color3.fromRGB
-local CYAN = C(40, 200, 255)
-
-local window
-local rows = {}
-local titleLabel: TextLabel
-
-local function attr(name) return player:GetAttribute(name) or 0 end
-
-local function playtime(seconds: number): string
-	local h = math.floor(seconds / 3600)
-	local m = math.floor((seconds % 3600) / 60)
-	if h > 0 then return h .. "h " .. m .. "m" end
-	return m .. "m"
+local Players=game:GetService("Players")
+local RS=game:GetService("ReplicatedStorage")
+local UI=require(script.Parent.UIKit)
+local NF=require(RS.Shared.Util.NumberFormat)
+local Titles=require(RS.Shared.Config.TitleConfig)
+local Tree=require(RS.Shared.Config.SkillTreeConfig)
+local Catalog=require(RS.Shared.Config.SushiCatalog)
+local player=Players.LocalPlayer
+local P={}
+local w=nil
+function P.Toggle() if w then w.Toggle() end end
+function P.Init()
+ w=UI.Window({Name="Profile",Title="Chef Profile",Icon="☺",Size = UI.Theme.Layout.ProfileController.Size1})
+ local list=UI.List(w.Body)
+ local portrait=UI.Card(list,{Name="Portrait",Title="@"..player.Name,Description="",Icon="☺",Action="Change title",Order=0,OnAction=function() require(script.Parent.TitlesController).Toggle() end})
+ local image=UI.new("ImageLabel",{Name="Avatar",Size = UI.Theme.Layout.ProfileController.Size2,Position=UDim2.fromOffset(12,12),BackgroundTransparency=1},portrait.Frame)
+ UI.Corner(image,18)
+ task.spawn(function() local ok,url=pcall(Players.GetUserThumbnailAsync,Players,player.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size420x420);if ok then image.Image=url end end)
+ local count=0;for _ in pairs(Catalog.Types) do count+=1 end
+ local specs={{"Cash","TotalMoney"},{"Playtime","Playtime"},{"Fish","TotalFish"},{"Rebirths","TotalRebirths"},{"Prestiges","TotalPrestiges"},{"Sushi","SushiCollected"},{"Weight","TotalKG"},{"Index","IndexCount"},{"Upgrades","TreeCount"},{"Titles","Titles"},{"Robux","RobuxSpent"}}
+ local values={}
+ for i,spec in ipairs(specs) do
+  local row=UI.new("Frame",{Name=spec[1],Size = UI.Theme.Layout.ProfileController.Size3,BackgroundColor3=UI.Theme.Colors.Rice.Light,LayoutOrder=i},list);UI.Corner(row,12);UI.Stroke(row,3,UI.Theme.Ink,true)
+  UI.Label(row,{Text="Total "..spec[1],Position=UDim2.fromOffset(12,8),Size = UI.Theme.Layout.ProfileController.Size4,TextXAlignment=Enum.TextXAlignment.Left},0)
+  values[spec[2]]=UI.Label(row,{Text="",Position=UDim2.new(0.55,0,0,8),Size = UI.Theme.Layout.ProfileController.Size5,TextXAlignment=Enum.TextXAlignment.Right},0)
+ end
+ local function refresh()
+  local title=Titles.ById[player:GetAttribute("EquippedTitle") or Titles.Default] or Titles.ById[Titles.Default];portrait.Description.Text="["..title.Name.."] • Nametag preview"
+  for _,spec in ipairs(specs) do
+   local key=spec[2];local n=player:GetAttribute(key) or 0
+   if key=="Titles" then n=0;for _,t in ipairs(Titles.List) do local _,ok=Titles.Progress(player,t.Id);if ok then n+=1 end end end
+   values[key].Text=key=="Playtime" and math.floor(n/3600).."h "..math.floor(n%3600/60).."m" or key=="TotalKG" and NF.KG(n) or NF.Format(n)
+   if key=="IndexCount" then values[key].Text..="/"..count elseif key=="TreeCount" then values[key].Text..="/"..Tree.Count elseif key=="Titles" then values[key].Text..="/"..#Titles.List end
+  end
+ end
+ table.insert(w.OnOpen,refresh);local dirty=true;player.AttributeChanged:Connect(function() dirty=true end);UI.Loop(w.Frame,function() if dirty then dirty=false;refresh() end end)
 end
-
-local sushiTypes = 0
-for _ in pairs(SushiCatalog.Types) do sushiTypes += 1 end
-
-local function unlockedTitles(): number
-	local n = 0
-	for _, t in ipairs(TitleConfig.List) do
-		local _, ok = TitleConfig.Progress(player, t.Id)
-		if ok then n += 1 end
-	end
-	return n
-end
-
--- { icon, word, color, value() }
-local STATS = {
-	{ "💵", "Cash", C(90, 255, 110), function() return NumberFormat.Format(attr("TotalMoney")) end },
-	{ "⏱️", "Playtime", C(80, 215, 255), function() return playtime(attr("Playtime")) end },
-	{ "🐟", "Fish", C(110, 200, 255), function() return NumberFormat.Format(attr("TotalFish")) end },
-	{ "🔄", "Rebirths", C(255, 80, 95), function() return NumberFormat.Format(attr("TotalRebirths")) end },
-	{ "⭐", "Prestiges", C(255, 215, 70), function() return NumberFormat.Format(attr("TotalPrestiges")) end },
-	{ "🍣", "Sushi", C(255, 225, 70), function() return NumberFormat.Format(attr("SushiCollected")) end },
-	{ "⚖️", "Weight", C(255, 180, 80), function() return NumberFormat.KG(attr("TotalKG")) end },
-	{ "📖", "Index", C(95, 185, 255), function() return attr("IndexCount") .. "/" .. sushiTypes end },
-	{ "🌸", "Upgrades", C(255, 140, 200), function() return attr("TreeCount") .. "/" .. SkillTreeConfig.Count end },
-	{ "🏷️", "Titles", C(255, 210, 60), function() return unlockedTitles() .. "/" .. #TitleConfig.List end },
-	{ "💎", "Robux", C(90, 255, 110), function() return NumberFormat.Format(attr("RobuxSpent")) end },
-}
-
-local function refresh()
-	for _, r in ipairs(rows) do r.Value.Text = r.Get() end
-	local t = TitleConfig.ById[player:GetAttribute("EquippedTitle") or ""] or TitleConfig.ById[TitleConfig.Default]
-	titleLabel.Text = "[" .. t.Name .. "]"
-	titleLabel.TextColor3 = t.Color
-end
-
-function ProfileController.Toggle() window.Toggle() end
-
-function ProfileController.Init()
-	window = UIKit.Window({ Name = "Profile", Title = "Profile", Icon = "👤", Accent = CYAN, Size = Vector2.new(860, 560) })
-	local body = window.Body
-	body:FindFirstChildOfClass("UIStroke").Color = CYAN
-
-	-- left: name, avatar, equipped title
-	local left = UIKit.new("Frame", { Name = "Card", Position = UDim2.fromOffset(14, 14), Size = UDim2.new(0, 230, 1, -28), BackgroundColor3 = UIKit.Colors.Panel }, body)
-	UIKit.Corner(left, 16)
-	UIKit.Stroke(left, 3.5, CYAN, true)
-	UIKit.Label(left, { Name = "Name", Text = player.Name, TextColor3 = CYAN, Size = UDim2.new(1, -20, 0, 36), Position = UDim2.fromOffset(10, 12) }, 3)
-	local frame = UIKit.new("Frame", { Name = "Avatar", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 62), Size = UDim2.fromOffset(186, 186), BackgroundColor3 = C(255, 255, 255) }, left)
-	UIKit.Corner(frame, 24)
-	UIKit.Stroke(frame, 4, CYAN, true)
-	local img = UIKit.new("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = "" }, frame)
-	UIKit.Corner(img, 24)
-	task.spawn(function()
-		local ok, content = pcall(Players.GetUserThumbnailAsync, Players, player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
-		if ok then img.Image = content end
-	end)
-	titleLabel = UIKit.Label(left, { Name = "Title", Text = "", Size = UDim2.new(1, -20, 0, 32), Position = UDim2.fromOffset(10, 262) }, 3)
-	UIKit.Label(left, { Name = "Hint", Text = "Change your title in 🏷️ Titles", TextColor3 = UIKit.Colors.Subtle, Size = UDim2.new(1, -20, 0, 18), Position = UDim2.fromOffset(10, 298) }, 2)
-
-	-- right: stat rows
-	local holder = UIKit.new("Frame", { Name = "Stats", BackgroundTransparency = 1, Position = UDim2.fromOffset(256, 0), Size = UDim2.new(1, -256, 1, 0) }, body)
-	local list = UIKit.List(holder, 8)
-	for i, s in ipairs(STATS) do
-		local row = UIKit.new("Frame", { Name = s[2], LayoutOrder = i, Size = UDim2.new(1, -6, 0, 62), BackgroundColor3 = UIKit.Colors.Row }, list)
-		UIKit.Corner(row, 14)
-		UIKit.Stroke(row, 3, CYAN, true)
-		UIKit.Label(row, { Text = s[1], Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, 9) }, 0)
-		UIKit.Label(row, { Text = 'Total <font color="#' .. s[3]:ToHex() .. '">' .. s[2] .. "</font>", TextXAlignment = Enum.TextXAlignment.Left,
-			Size = UDim2.new(0.6, -64, 0, 38), Position = UDim2.fromOffset(64, 12) }, 3)
-		local value = UIKit.Label(row, { Text = "", TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0),
-			Size = UDim2.new(0.4, -16, 0, 34), Position = UDim2.new(1, -16, 0, 14) }, 3)
-		table.insert(rows, { Value = value, Get = s[4] })
-	end
-
-	table.insert(window.OnOpen, refresh)
-	task.spawn(function()
-		while true do
-			task.wait(1)
-			if window.IsOpen() then refresh() end
-		end
-	end)
-end
-
-return ProfileController
+return P

@@ -1,8 +1,9 @@
+local UIKit = require(script.Parent.UIKit)
 -- AnnouncementController: top banner when a very rare sushi spawns for you,
 -- and a server-wide chat message when anyone collects a Mythic/Secret.
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local TextChatService = game:GetService("TextChatService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,11 +23,12 @@ local queue = {}
 local showing = false
 
 local function showNext()
+	if #queue>0 then local item=table.remove(queue,1);UIKit.Toast(item.Text,item.Color);showing=false;if #queue>0 then task.defer(showNext) end;return end
 	if showing or #queue == 0 then return end
 	showing = true
 	local item = table.remove(queue, 1)
 	bannerText.Text = item.Text
-	banner.BackgroundColor3 = item.Rainbow and Color3.new(1, 1, 1) or item.Color
+	banner.BackgroundColor3 = item.Rainbow and UIKit.Theme.White or item.Color
 	if item.Rainbow then
 		local keys = {}
 		for i = 0, 6 do
@@ -35,7 +37,7 @@ local function showNext()
 		bannerGradient.Color = ColorSequence.new(keys)
 		bannerGradient.Rotation = 0
 	else
-		bannerGradient.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 200, 200))
+		bannerGradient.Color = ColorSequence.new(UIKit.Theme.White, UIKit.Theme.Colors.Rice.Base)
 		bannerGradient.Rotation = 90
 	end
 	banner.Position = UDim2.new(0.5, 0, 0, -120)
@@ -95,33 +97,33 @@ function AnnouncementController.Init()
 	banner = Instance.new("Frame")
 	banner.Name = "Banner"
 	banner.AnchorPoint = Vector2.new(0.5, 0)
-	banner.Size = UDim2.new(0.9, 0, 0, 70)
+	banner.Size = UIKit.Theme.Layout.AnnouncementController.Size1
 	banner.Visible = false
 	banner.Parent = gui
 	Instance.new("UICorner", banner).CornerRadius = UDim.new(0, 16)
 	local st = Instance.new("UIStroke")
 	st.Thickness = 4
-	st.Color = Color3.fromRGB(30, 20, 40)
+	st.Color = UIKit.Theme.Colors.Rice.Dark
 	st.Parent = banner
 	bannerGradient = Instance.new("UIGradient")
-	bannerGradient.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 200, 200))
+	bannerGradient.Color = ColorSequence.new(UIKit.Theme.White, UIKit.Theme.Colors.Rice.Base)
 	bannerGradient.Rotation = 90
 	bannerGradient.Parent = banner
 	local sizeLimit = Instance.new("UISizeConstraint")
-	sizeLimit.MaxSize = Vector2.new(560, 70)
+	sizeLimit.MaxSize = UIKit.Theme.Layout.AnnouncementController.Size2
 	sizeLimit.Parent = banner
 
 	bannerText = Instance.new("TextLabel")
 	bannerText.BackgroundTransparency = 1
-	bannerText.Size = UDim2.new(1, -24, 1, -12)
+	bannerText.Size = UIKit.Theme.Layout.AnnouncementController.Size3
 	bannerText.Position = UDim2.fromOffset(12, 6)
-	bannerText.Font = Enum.Font.FredokaOne
+	bannerText.Font = UIKit.Font
 	bannerText.TextScaled = true
-	bannerText.TextColor3 = Color3.new(1, 1, 1)
+	bannerText.TextColor3 = UIKit.Theme.White
 	bannerText.Parent = banner
 	local ts = Instance.new("UIStroke")
 	ts.Thickness = 3
-	ts.Color = Color3.fromRGB(30, 20, 40)
+	ts.Color = UIKit.Theme.Colors.Rice.Dark
 	ts.Parent = bannerText
 
 	ReplicatedStorage.Remotes.RareFound.OnClientEvent:Connect(onRareFound)

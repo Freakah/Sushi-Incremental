@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- TutorialController: the 5-step onboarding bubble on the right side of the screen,
 -- plus the guide arrows (a bouncing 3D arrow over the objective and a chevron trail
 -- on the ground from the player to it).
@@ -9,7 +10,7 @@
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -23,27 +24,26 @@ local HudController = require(script.Parent.HudController)
 local player = Players.LocalPlayer
 local TutorialController = {}
 
-local C = Color3.fromRGB
 local COL = {
-	Cream = C(255, 249, 247),
-	Border = C(198, 176, 252),
-	TitlePill = C(236, 226, 255),
-	TitleStroke = C(138, 92, 228),
-	Text = C(112, 72, 196),
-	Tip = C(253, 233, 244),
-	StepPill = C(172, 142, 246),
-	Blue1 = C(130, 186, 255),
-	Blue2 = C(92, 148, 246),
-	BlueEdge = C(78, 126, 228),
-	BlueTrack = C(218, 232, 255),
-	Green1 = C(140, 230, 140),
-	Green2 = C(70, 190, 100),
-	GreenEdge = C(52, 152, 82),
-	Plum = C(92, 48, 78),
-	Arrow = C(176, 124, 255),
-	Trail = C(150, 96, 255), -- Neon brightens this to a soft lavender glow
+	Cream = UIKit.Theme.White,
+	Border = UIKit.Theme.Currency.Fish.Base,
+	TitlePill = UIKit.Theme.White,
+	TitleStroke = UIKit.Theme.Currency.Fish.Base,
+	Text = UIKit.Theme.Currency.Fish.Base,
+	Tip = UIKit.Theme.White,
+	StepPill = UIKit.Theme.Currency.Fish.Base,
+	Blue1 = UIKit.Theme.Currency.Fish.Base,
+	Blue2 = UIKit.Theme.Currency.Fish.Base,
+	BlueEdge = UIKit.Theme.Currency.Fish.Base,
+	BlueTrack = UIKit.Theme.Currency.Fish.Base,
+	Green1 = UIKit.Theme.Colors.Success.Base,
+	Green2 = UIKit.Theme.Colors.Success.Base,
+	GreenEdge = UIKit.Theme.Colors.Success.Base,
+	Plum = UIKit.Theme.Colors.Danger.Base,
+	Arrow = UIKit.Theme.Currency.Fish.Base,
+	Trail = UIKit.Theme.Currency.Fish.Base, -- Neon brightens this to a soft lavender glow
 }
-local FONT = Enum.Font.FredokaOne
+local FONT = UIKit.Font
 local W, H = 300, 224   -- expanded bubble (before scaling)
 local CW, CH = 250, 54  -- compact pill
 local TOTAL = 5
@@ -226,41 +226,41 @@ local userCompact = false
 local compact = false
 
 local function buildMascot(parent)
-	local m = new("Frame", { Name = "Mascot", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(72, 72), ZIndex = 20 }, parent)
+	local m = new("Frame", { Name = "Mascot", BackgroundTransparency = 1, AnchorPoint = Vector2.new(0.5, 0.5), Size = UIKit.Theme.Layout.TutorialController.Size1, ZIndex = 20 }, parent)
 	local sc = new("UIScale", {}, m)
 	-- rice
-	local rice = new("Frame", { Name = "Rice", BackgroundColor3 = C(255, 255, 255), Position = UDim2.fromOffset(8, 30), Size = UDim2.fromOffset(56, 34), ZIndex = 3 }, m)
+	local rice = new("Frame", { Name = "Rice", BackgroundColor3 = UIKit.Theme.White, Position = UDim2.fromOffset(8, 30), Size = UIKit.Theme.Layout.TutorialController.Size2, ZIndex = 3 }, m)
 	corner(rice, 16)
 	stroke(rice, 3, COL.Plum, true)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(C(255, 255, 255), C(244, 236, 240)) }, rice)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(UIKit.Theme.White, UIKit.Theme.White) }, rice)
 	-- salmon slice
-	local fish = new("Frame", { Name = "Fish", BackgroundColor3 = C(255, 255, 255), Position = UDim2.fromOffset(4, 10), Size = UDim2.fromOffset(64, 30), Rotation = -4, ZIndex = 4 }, m)
+	local fish = new("Frame", { Name = "Fish", BackgroundColor3 = UIKit.Theme.White, Position = UDim2.fromOffset(4, 10), Size = UIKit.Theme.Layout.TutorialController.Size3, Rotation = -4, ZIndex = 4 }, m)
 	corner(fish, 15)
 	stroke(fish, 3, COL.Plum, true)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(C(255, 156, 128), C(242, 98, 92)) }, fish)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(UIKit.Theme.Colors.Primary.Base, UIKit.Theme.Colors.Danger.Base) }, fish)
 	for i = 0, 2 do
-		local s = new("Frame", { BackgroundColor3 = C(255, 226, 212), BackgroundTransparency = 0.1, BorderSizePixel = 0, Position = UDim2.fromOffset(16 + i * 13, 7), Size = UDim2.fromOffset(5, 16), Rotation = 28 }, fish)
+		local s = new("Frame", { BackgroundColor3 = UIKit.Theme.Colors.Primary.Light, BackgroundTransparency = 0.1, BorderSizePixel = 0, Position = UDim2.fromOffset(16 + i * 13, 7), Size = UIKit.Theme.Layout.TutorialController.Size4, Rotation = 28 }, fish)
 		corner(s, 3)
 	end
 	-- face
 	ui.Eyes = {}
 	for _, x in ipairs({ 24, 42 }) do
-		local e = new("Frame", { BackgroundColor3 = COL.Plum, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromOffset(x, 48), Size = UDim2.fromOffset(6, 8), ZIndex = 6 }, m)
+		local e = new("Frame", { BackgroundColor3 = COL.Plum, AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromOffset(x, 48), Size = UIKit.Theme.Layout.TutorialController.Size5, ZIndex = 6 }, m)
 		corner(e)
-		new("Frame", { BackgroundColor3 = C(255, 255, 255), BorderSizePixel = 0, Position = UDim2.fromOffset(1, 1), Size = UDim2.fromOffset(2, 2) }, e)
+		new("Frame", { BackgroundColor3 = UIKit.Theme.White, BorderSizePixel = 0, Position = UDim2.fromOffset(1, 1), Size = UIKit.Theme.Layout.TutorialController.Size6 }, e)
 		table.insert(ui.Eyes, e)
 	end
 	for _, x in ipairs({ 14, 49 }) do
-		local b = new("Frame", { BackgroundColor3 = C(255, 160, 186), BackgroundTransparency = 0.15, Position = UDim2.fromOffset(x, 52), Size = UDim2.fromOffset(9, 5), ZIndex = 6 }, m)
+		local b = new("Frame", { BackgroundColor3 = UIKit.Theme.Colors.Primary.Base, BackgroundTransparency = 0.15, Position = UDim2.fromOffset(x, 52), Size = UIKit.Theme.Layout.TutorialController.Size7, ZIndex = 6 }, m)
 		corner(b)
 	end
-	local mouth = new("Frame", { BackgroundColor3 = COL.Plum, Position = UDim2.fromOffset(32, 53), Size = UDim2.fromOffset(8, 5), ZIndex = 6 }, m)
+	local mouth = new("Frame", { BackgroundColor3 = COL.Plum, Position = UDim2.fromOffset(32, 53), Size = UIKit.Theme.Layout.TutorialController.Size8, ZIndex = 6 }, m)
 	corner(mouth, 3)
 	-- sparkle ticks above its head (like the reference)
 	for i, spec in ipairs({ { -4, 4, -45 }, { 8, -6, -18 }, { 22, -9, 8 } }) do
-		local s = new("Frame", { Name = "Spark" .. i, BackgroundColor3 = C(255, 214, 90), Position = UDim2.fromOffset(spec[1], spec[2]), Size = UDim2.fromOffset(6, 13), Rotation = spec[3], ZIndex = 2 }, m)
+		local s = new("Frame", { Name = "Spark" .. i, BackgroundColor3 = UIKit.Theme.Colors.Accent.Base, Position = UDim2.fromOffset(spec[1], spec[2]), Size = UIKit.Theme.Layout.TutorialController.Size9, Rotation = spec[3], ZIndex = 2 }, m)
 		corner(s)
-		stroke(s, 1.5, C(236, 170, 60), true)
+		stroke(s, 1.5, UIKit.Theme.Colors.Primary.Base, true)
 	end
 	return m, sc
 end
@@ -277,7 +277,7 @@ local function buildBubble()
 	holder = new("Frame", { Name = "Holder", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Size = UDim2.fromOffset(W, H) }, gui)
 	holderScale = new("UIScale", {}, holder)
 	-- CanvasGroup so the whole bubble fades as one; padded so the mascot/tail aren't clipped
-	group = new("CanvasGroup", { Name = "Group", BackgroundTransparency = 1, Position = UDim2.fromOffset(-50, -50), Size = UDim2.new(1, 70, 1, 84), GroupTransparency = 1 }, holder)
+	group = new("CanvasGroup", { Name = "Group", BackgroundTransparency = 1, Position = UDim2.fromOffset(-50, -50), Size = UIKit.Theme.Layout.TutorialController.Size10, GroupTransparency = 1 }, holder)
 
 	bubble = new("Frame", { Name = "Bubble", BackgroundColor3 = COL.Cream, Position = UDim2.fromOffset(50, 50), Size = UDim2.fromOffset(W, H), ZIndex = 2 }, group)
 	corner(bubble, 26)
@@ -285,52 +285,52 @@ local function buildBubble()
 	ui.BubbleScale = new("UIScale", {}, bubble)
 
 	-- speech tail (a rotated square tucked under the bottom-left edge)
-	ui.Tail = new("Frame", { Name = "Tail", BackgroundColor3 = COL.Cream, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 34, 1, -2), Size = UDim2.fromOffset(20, 20), Rotation = 45, ZIndex = 1 }, bubble)
+	ui.Tail = new("Frame", { Name = "Tail", BackgroundColor3 = COL.Cream, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0, 34, 1, -2), Size = UIKit.Theme.Layout.TutorialController.Size11, Rotation = 45, ZIndex = 1 }, bubble)
 	corner(ui.Tail, 4)
 	stroke(ui.Tail, 4.5, COL.Border, true)
-	ui.TailCover = new("Frame", { Name = "TailCover", BackgroundColor3 = COL.Cream, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0, 34, 1, 0), Size = UDim2.fromOffset(30, 14), ZIndex = 3 }, bubble)
+	ui.TailCover = new("Frame", { Name = "TailCover", BackgroundColor3 = COL.Cream, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0, 34, 1, 0), Size = UIKit.Theme.Layout.TutorialController.Size12, ZIndex = 3 }, bubble)
 
 	-- title pill
-	ui.TitlePill = new("Frame", { Name = "TitlePill", BackgroundColor3 = COL.TitlePill, Position = UDim2.fromOffset(62, 14), Size = UDim2.fromOffset(0, 36), AutomaticSize = Enum.AutomaticSize.X, ZIndex = 4 }, bubble)
+	ui.TitlePill = new("Frame", { Name = "TitlePill", BackgroundColor3 = COL.TitlePill, Position = UDim2.fromOffset(62, 14), Size = UIKit.Theme.Layout.TutorialController.Size13, AutomaticSize = Enum.AutomaticSize.X, ZIndex = 4 }, bubble)
 	corner(ui.TitlePill)
 	new("UIPadding", { PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, ui.TitlePill)
-	ui.Title = label(ui.TitlePill, { Name = "Title", Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, TextSize = 27, TextColor3 = C(255, 255, 255), ZIndex = 5 })
+	ui.Title = label(ui.TitlePill, { Name = "Title", Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, TextSize = 27, TextColor3 = UIKit.Theme.White, ZIndex = 5 })
 	stroke(ui.Title, 3, COL.TitleStroke)
 
 	-- step counter
-	ui.StepPill = new("Frame", { Name = "StepPill", BackgroundColor3 = COL.StepPill, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 17), Size = UDim2.fromOffset(52, 30), ZIndex = 4 }, bubble)
+	ui.StepPill = new("Frame", { Name = "StepPill", BackgroundColor3 = COL.StepPill, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -14, 0, 17), Size = UIKit.Theme.Layout.TutorialController.Size14, ZIndex = 4 }, bubble)
 	corner(ui.StepPill)
-	ui.StepText = label(ui.StepPill, { Size = UDim2.fromScale(1, 1), TextSize = 18, TextColor3 = C(255, 255, 255), ZIndex = 5 })
+	ui.StepText = label(ui.StepPill, { Size = UDim2.fromScale(1, 1), TextSize = 18, TextColor3 = UIKit.Theme.White, ZIndex = 5 })
 
 	-- description
-	ui.Desc = label(bubble, { Name = "Desc", Position = UDim2.fromOffset(18, 56), Size = UDim2.new(1, -36, 0, 54), TextScaled = true, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 4 })
+	ui.Desc = label(bubble, { Name = "Desc", Position = UDim2.fromOffset(18, 56), Size = UIKit.Theme.Layout.TutorialController.Size15, TextScaled = true, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center, ZIndex = 4 })
 
 	-- tip box
-	ui.TipBox = new("Frame", { Name = "Tip", BackgroundColor3 = COL.Tip, Position = UDim2.fromOffset(16, 116), Size = UDim2.new(1, -32, 0, 46), ZIndex = 4 }, bubble)
+	ui.TipBox = new("Frame", { Name = "Tip", BackgroundColor3 = COL.Tip, Position = UDim2.fromOffset(16, 116), Size = UIKit.Theme.Layout.TutorialController.Size16, ZIndex = 4 }, bubble)
 	corner(ui.TipBox, 14)
-	ui.TipIcon = label(ui.TipBox, { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 8, 0.5, 0), Size = UDim2.fromOffset(32, 32), TextSize = 24, ZIndex = 5 })
+	ui.TipIcon = label(ui.TipBox, { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 8, 0.5, 0), Size = UIKit.Theme.Layout.TutorialController.Size17, TextSize = 24, ZIndex = 5 })
 	new("UITextSizeConstraint", { MaxTextSize = 17 }, ui.Desc)
-	ui.TipText = label(ui.TipBox, { Position = UDim2.fromOffset(46, 5), Size = UDim2.new(1, -54, 1, -10), TextScaled = true, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = C(128, 86, 206), ZIndex = 5 })
+	ui.TipText = label(ui.TipBox, { Position = UDim2.fromOffset(46, 5), Size = UIKit.Theme.Layout.TutorialController.Size18, TextScaled = true, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = UIKit.Theme.Currency.Fish.Base, ZIndex = 5 })
 
 	new("UITextSizeConstraint", { MaxTextSize = 14 }, ui.TipText)
 
 	-- goal pill (blue, fills up with progress)
-	ui.Goal = new("Frame", { Name = "Goal", BackgroundColor3 = COL.BlueTrack, Position = UDim2.fromOffset(16, 172), Size = UDim2.new(1, -32, 0, 38), ZIndex = 4 }, bubble)
+	ui.Goal = new("Frame", { Name = "Goal", BackgroundColor3 = COL.BlueTrack, Position = UDim2.fromOffset(16, 172), Size = UIKit.Theme.Layout.TutorialController.Size19, ZIndex = 4 }, bubble)
 	corner(ui.Goal)
 	ui.GoalStroke = stroke(ui.Goal, 3, COL.BlueEdge, true)
 	ui.GoalScale = new("UIScale", {}, ui.Goal)
-	ui.Fill = new("Frame", { Name = "Fill", BackgroundColor3 = C(255, 255, 255), Size = UDim2.fromScale(1, 1), ZIndex = 5 }, ui.Goal)
+	ui.Fill = new("Frame", { Name = "Fill", BackgroundColor3 = UIKit.Theme.White, Size = UDim2.fromScale(1, 1), ZIndex = 5 }, ui.Goal)
 	corner(ui.Fill)
 	ui.FillGradient = new("UIGradient", { Rotation = 90, Color = ColorSequence.new(COL.Blue1, COL.Blue2) }, ui.Fill)
-	new("UISizeConstraint", { MinSize = Vector2.new(38, 0) }, ui.Fill)
-	ui.GoalText = label(ui.Goal, { Position = UDim2.fromOffset(16, 6), Size = UDim2.new(1, -50, 1, -12), TextScaled = true, TextColor3 = C(255, 255, 255), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 })
+	new("UISizeConstraint", { MinSize = UIKit.Theme.Layout.TutorialController.Size20 }, ui.Fill)
+	ui.GoalText = label(ui.Goal, { Position = UDim2.fromOffset(16, 6), Size = UIKit.Theme.Layout.TutorialController.Size21, TextScaled = true, TextColor3 = UIKit.Theme.White, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6 })
 	ui.GoalTextLimit = new("UITextSizeConstraint", { MaxTextSize = 17 }, ui.GoalText)
 	ui.GoalTextStroke = stroke(ui.GoalText, 2, COL.BlueEdge)
 	-- chevron ">" on the right that nudges forward
-	ui.Chevron = new("Frame", { Name = "Chevron", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(16, 18), ZIndex = 6 }, ui.Goal)
+	ui.Chevron = new("Frame", { Name = "Chevron", BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UIKit.Theme.Layout.TutorialController.Size22, ZIndex = 6 }, ui.Goal)
 	ui.ChevronParts = {}
 	for i, rot in ipairs({ 45, -45 }) do
-		local arm = new("Frame", { BackgroundColor3 = C(255, 255, 255), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, i == 1 and -4 or 4), Size = UDim2.fromOffset(12, 4.5), Rotation = rot, ZIndex = 7 }, ui.Chevron)
+		local arm = new("Frame", { BackgroundColor3 = UIKit.Theme.White, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, i == 1 and -4 or 4), Size = UIKit.Theme.Layout.TutorialController.Size23, Rotation = rot, ZIndex = 7 }, ui.Chevron)
 		corner(arm)
 		stroke(arm, 1.5, COL.BlueEdge, true)
 		table.insert(ui.ChevronParts, arm)
@@ -340,6 +340,7 @@ local function buildBubble()
 
 	-- click / tap the bubble to shrink or expand it
 	local toggle = new("TextButton", { Name = "Toggle", Text = "", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 30 }, bubble)
+	UIKit.Animate(toggle)
 	toggle.Activated:Connect(function()
 		userCompact = not userCompact
 	end)
@@ -361,12 +362,12 @@ local function applyLayout(isCompact: boolean)
 		ui.Mascot.Position = UDim2.fromOffset(26, 27)
 		ui.MascotScale.Scale = 0.62
 		ui.Goal.Position = UDim2.fromOffset(54, 9)
-		ui.Goal.Size = UDim2.new(1, -64, 0, 36)
+		ui.Goal.Size = UIKit.Theme.Layout.TutorialController.Size24
 	else
 		ui.Mascot.Position = UDim2.fromOffset(18, 14)
 		ui.MascotScale.Scale = 1
 		ui.Goal.Position = UDim2.fromOffset(16, 172)
-		ui.Goal.Size = UDim2.new(1, -32, 0, 38)
+		ui.Goal.Size = UIKit.Theme.Layout.TutorialController.Size25
 	end
 end
 
@@ -418,7 +419,7 @@ local function appear()
 	slide.Value = 60
 	group.GroupTransparency = 1
 	ui.BubbleScale.Scale = 0.85
-	local info = TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+	local info = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 	TweenService:Create(slide, info, { Value = 0 }):Play()
 	TweenService:Create(ui.BubbleScale, info, { Scale = 1 }):Play()
 	TweenService:Create(group, TweenInfo.new(0.25), { GroupTransparency = 0 }):Play()
@@ -477,8 +478,8 @@ local function buildMarker()
 	marker.WorldPivot = CFrame.new() -- the arrow tip sits ~1 stud under the pivot
 	-- soft dark outline so the arrow reads on the light pad
 	new("Highlight", {
-		FillColor = C(255, 255, 255), FillTransparency = 1,
-		OutlineColor = C(40, 22, 70), OutlineTransparency = 0.1,
+		FillColor = UIKit.Theme.White, FillTransparency = 1,
+		OutlineColor = UIKit.Theme.Currency.Fish.Base, OutlineTransparency = 0.1,
 		DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
 	}, marker)
 	marker.Parent = nil
@@ -548,14 +549,14 @@ local active = false -- a step (1..5) is on screen and its arrows should show
 local function placeBubble()
 	local cam = workspace.CurrentCamera
 	local vp = cam.ViewportSize
-	local s = math.clamp(math.min(vp.X / 1500, vp.Y / 850), 0.6, 1.1)
+	local s = math.clamp(math.min(vp.X / 1500, vp.Y / 850), 0.9, 1.1)
 	holderScale.Scale = s
 	local screenH = gui.AbsoluteSize.Y
 	local y
 	local wantCompact = userCompact
 	if isTouch() then
 		-- phones: small pill in the top-right corner, clear of the thumbstick and jump button
-		y = 8
+		y = math.max(62, math.min(350, screenH - (wantCompact and CH or H)*s - 16))
 		wantCompact = not userCompact -- tap to expand
 	else
 		-- PC / console: right under the currency bars
@@ -586,13 +587,13 @@ local function step()
 	-- mascot idle bob + hop on completion, blink now and then
 	local hopT = ui.Hop and (now - ui.Hop) or 99
 	local hop = hopT < 0.5 and math.sin(hopT / 0.5 * math.pi) * 14 or 0
-	local bob = math.sin(now * 2.4) * 2 + hop
+	local bob = UIKit.ReducedMotion() and 0 or math.sin(now * 2.4) * 2 + hop
 	local base = compact and UDim2.fromOffset(26, 27) or UDim2.fromOffset(18, 14)
 	ui.Mascot.Position = base - UDim2.fromOffset(0, bob)
-	ui.Mascot.Rotation = math.sin(now * 1.7) * 4
-	local blink = (now % 3.6) < 0.12
+	ui.Mascot.Rotation = UIKit.ReducedMotion() and 0 or math.sin(now * 1.7) * 4
+	local blink = not UIKit.ReducedMotion() and (now % 3.6) < 0.12
 	for _, e in ipairs(ui.Eyes) do e.Size = UDim2.fromOffset(6, blink and 2 or 8) end
-	ui.Chevron.Position = UDim2.new(1, -14 + math.sin(now * 5) * 2.5, 0.5, 0)
+	ui.Chevron.Position = UDim2.new(1, -14 + (UIKit.ReducedMotion() and 0 or math.sin(now * 5) * 2.5), 0.5, 0)
 
 	-- arrows
 	local character = player.Character
@@ -608,16 +609,16 @@ local function step()
 			markerScale = want
 			marker:ScaleTo(markerScale)
 		end
-		local y = (math.sin(now * 3.2) * 0.5 + 0.5) * 1.1 * markerScale
-		marker:PivotTo(CFrame.new(target + Vector3.new(0, y, 0)) * CFrame.Angles(0, now * 1.8, 0))
-		updateTrail(root, target, now)
+		local y = UIKit.ReducedMotion() and 0 or (math.sin(now * 3.2) * 0.5 + 0.5) * 1.1 * markerScale
+		marker:PivotTo(CFrame.new(target + Vector3.new(0, y, 0)) * CFrame.Angles(0, UIKit.ReducedMotion() and 0 or now * 1.8, 0))
+		updateTrail(root, target, UIKit.ReducedMotion() and 0 or now)
 	else
 		if marker.Parent then marker.Parent = nil end
 		hideTrail()
 	end
 
 	-- other areas aren't part of the tutorial: tuck the bubble away while you're there
-	group.Visible = not inNight
+	group.Visible = not inNight and not require(script.Parent.MenuManager).Current()
 end
 
 -- ===== step flow =====

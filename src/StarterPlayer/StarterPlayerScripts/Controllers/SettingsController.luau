@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- SettingsController: the ⚙️ Settings menu, plus the settings that don't
 -- belong to another system (Hide Other Players, Particles).
 -- Music/SFX/Volume -> AudioController, Night Mode -> ZoneController,
@@ -8,7 +9,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local SettingsConfig = require(ReplicatedStorage.Shared.Config.SettingsConfig)
 local SettingsState = require(script.Parent.SettingsState)
-local UIKit = require(script.Parent.UIKit)
 
 local player = Players.LocalPlayer
 local SettingsController = {}
@@ -65,7 +65,7 @@ end
 -- ===== menu =====
 
 local function build()
-	window = UIKit.Window({ Name = "Settings", Title = "Settings", Icon = "⚙️", Size = Vector2.new(640, 720) })
+	window = UIKit.Window({ Name = "Settings", Title = "Settings", Icon = "⚙️", Size = UIKit.Theme.Layout.SettingsController.Size1 })
 	local list = UIKit.List(window.Body, 10)
 	for _, s in ipairs(SettingsConfig.List) do
 		local row = UIKit.Row(list, s.Icon, s.Name, s.Order)

@@ -13,6 +13,13 @@ local SettingsState = require(script.Parent.SettingsState)
 local player = Players.LocalPlayer
 local AudioController = {}
 
+function AudioController.PlayUI(cue: string)
+	if SettingsState.Get("SFX") == false then return end
+	local theme = require(script.Parent.UIKit).Theme
+	local speeds = { Close = 0.85, Error = 0.55, Open = 1.1 }
+	EffectsController.PlaySound(theme.Sounds[cue] or "UIClick", speeds[cue])
+end
+
 local musicGroup: SoundGroup
 local music: Sound
 local playlist = {}
@@ -48,11 +55,11 @@ local function hookButton(b: Instance)
 	b.MouseEnter:Connect(function()
 		if os.clock() - lastHover > 0.06 then
 			lastHover = os.clock()
-			EffectsController.PlaySound("UIHover", 1 + (math.random() - 0.5) * 0.1)
+			if not b:GetAttribute("Disabled") and not b:GetAttribute("NoSound") then AudioController.PlayUI("Hover") end
 		end
 	end)
 	b.Activated:Connect(function()
-		EffectsController.PlaySound("UIClick")
+		if not b:GetAttribute("Disabled") and not b:GetAttribute("NoSound") then AudioController.PlayUI("Click") end
 	end)
 end
 

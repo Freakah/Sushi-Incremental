@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- SushiController: renders this player's sushi, animates them, detects walk-over
 -- pickups and plays the collect feedback. The server has the final say on every pickup.
 
@@ -21,8 +22,8 @@ local SushiController = {}
 
 local SPAWN_TIME = 0.28
 local AUTO_FLY_TIME = 0.4
-local CRIT_COLOR = Color3.fromRGB(255, 150, 40)
-local AUTO_COLOR = Color3.fromRGB(150, 210, 255)
+local CRIT_COLOR = UIKit.Theme.Colors.Primary.Base
+local AUTO_COLOR = UIKit.Theme.Currency.Fish.Base
 local POP_TIME = 0.16
 local HOVER = 0.15
 
@@ -90,7 +91,7 @@ local function buildEntryModel(entry: Entry)
 		halo.Shape = Enum.PartType.Cylinder
 		halo.Size = Vector3.new(0.15, math.max(size.X, size.Z) + 1.2, math.max(size.X, size.Z) + 1.2)
 		halo.CFrame = CFrame.new(cf.Position.X, cf.Position.Y - size.Y / 2 + 0.1, cf.Position.Z) * CFrame.Angles(0, 0, math.rad(90))
-		halo.Color = Color3.fromRGB(255, 205, 50)
+		halo.Color = UIKit.Theme.Colors.Primary.Base
 		halo.Material = Enum.Material.Neon
 		halo.Transparency = 0.25
 		halo.Anchored = true
@@ -101,7 +102,7 @@ local function buildEntryModel(entry: Entry)
 		local core = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart", true)
 		if core and SettingsState.Get("Particles") then
 			local sp = Instance.new("Sparkles")
-			sp.SparkleColor = Color3.fromRGB(255, 220, 90)
+			sp.SparkleColor = UIKit.Theme.Colors.Accent.Base
 			sp.Parent = core
 		end
 	end
@@ -150,7 +151,7 @@ local function onSpawned(payload, isInitial: boolean)
 	buildEntryModel(entry)
 	if not isInitial and payload.Pos then
 		-- a small soft puff where the sushi appears
-		EffectsController.Burst(payload.Pos + Vector3.new(0, 0.6, 0), Color3.fromRGB(255, 236, 200), 5)
+		EffectsController.Burst(payload.Pos + Vector3.new(0, 0.6, 0), UIKit.Theme.Colors.Primary.Light, 5)
 	end
 	if entry.Rarity.Order >= GameConfig.AnnounceSpawnOrder then
 		AnnouncementController.RareSpawned(payload.Type)
@@ -177,7 +178,7 @@ local function collectLocally(entry: Entry)
 	local order = entry.Rarity.Order
 	if batch.Bursts < 6 or order >= 3 then
 		batch.Bursts += 1
-		local color = order == 1 and Color3.fromRGB(255, 230, 200) or entry.Rarity.Color
+		local color = order == 1 and UIKit.Theme.Colors.Primary.Light or entry.Rarity.Color
 		EffectsController.Burst(pos, color, 8 + order * 4)
 	end
 	batch.Count += 1
@@ -197,7 +198,7 @@ local function flushBatch()
 
 	EffectsController.PlaySound("Collect", 1 + math.min(combo, 12) * 0.04 + (math.random() - 0.5) * 0.06)
 	local rarity = batch.BestRarity
-	local textColor = rarity.Order == 1 and Color3.new(1, 1, 1) or rarity.Color
+	local textColor = rarity.Order == 1 and UIKit.Theme.White or rarity.Color
 	local textPos = batch.Pos
 	local label = "+" .. NumberFormat.KG(batch.KG)
 	if batch.Count > 1 then
@@ -242,7 +243,7 @@ local function step()
 			local t = (now - entry.AutoFly) / AUTO_FLY_TIME
 			local target = root and (root :: BasePart).Position or pos
 			if t >= 1 then
-				EffectsController.Burst(target, entry.Rarity.Order == 1 and Color3.fromRGB(150, 210, 255) or entry.Rarity.Color, 8)
+				EffectsController.Burst(target, entry.Rarity.Order == 1 and UIKit.Theme.Currency.Fish.Base or entry.Rarity.Color, 8)
 				destroyModel(entry)
 				entries[id] = nil
 			else
@@ -324,7 +325,7 @@ function SushiController.Init()
 	local outline = Instance.new("Highlight")
 	outline.Name = "SushiOutline"
 	outline.FillTransparency = 1
-	outline.OutlineColor = Color3.fromRGB(45, 32, 55)
+	outline.OutlineColor = UIKit.Theme.Ink
 	outline.OutlineTransparency = 0.35
 	outline.DepthMode = Enum.HighlightDepthMode.Occluded
 	outline.Parent = folder
@@ -334,7 +335,7 @@ function SushiController.Init()
 	Remotes.SushiCleared.OnClientEvent:Connect(function()
 		for id, entry in pairs(entries) do
 			if entry.Model then
-				EffectsController.Burst(entry.Payload.Pos + Vector3.new(0, 1, 0), Color3.fromRGB(255, 150, 200), 6)
+				EffectsController.Burst(entry.Payload.Pos + Vector3.new(0, 1, 0), UIKit.Theme.Colors.Primary.Base, 6)
 			end
 			destroyModel(entry)
 			entries[id] = nil
@@ -346,12 +347,12 @@ function SushiController.Init()
 		local root = character and character:FindFirstChild("HumanoidRootPart")
 
 		if entry and entry.Payload.Golden and root then
-			EffectsController.FloatingText(root.Position + Vector3.new(0, 6.5, 0), "✨ GOLDEN x5!", Color3.fromRGB(255, 210, 60), true)
-			EffectsController.Burst(root.Position + Vector3.new(0, 2, 0), Color3.fromRGB(255, 210, 60), 20)
+			EffectsController.FloatingText(root.Position + Vector3.new(0, 6.5, 0), "✨ GOLDEN x5!", UIKit.Theme.Colors.Primary.Base, true)
+			EffectsController.Burst(root.Position + Vector3.new(0, 2, 0), UIKit.Theme.Colors.Primary.Base, 20)
 		end
 		-- 🫙 Tip Jar cash
 		if tip and tip > 0 and root and SettingsState.Get("PickupPopups") then
-			EffectsController.FloatingText(root.Position + Vector3.new(0, 4, 0), "🫙 Tip +" .. NumberFormat.Cash(tip), Color3.fromRGB(110, 235, 110), false)
+			EffectsController.FloatingText(root.Position + Vector3.new(0, 4, 0), "🫙 Tip +" .. NumberFormat.Cash(tip), UIKit.Theme.Colors.Success.Base, false)
 		end
 
 		-- 💥 Critical Catch (rolled on the server)

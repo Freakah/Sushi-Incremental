@@ -1,9 +1,10 @@
+local UIKit = require(script.Parent.UIKit)
 -- ZoneController: portal detection + travel transition, per-zone lighting
 -- (day / night), the zone title card, and lock signs over the portals.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local Lighting = game:GetService("Lighting")
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,7 +18,7 @@ local player = Players.LocalPlayer
 
 local ZoneController = {}
 
-local DARK = Color3.fromRGB(28, 22, 40)
+local DARK = UIKit.Theme.Ink
 
 local gui: ScreenGui
 local fade: Frame
@@ -36,14 +37,14 @@ local NIGHT = {
 		ClockTime = 0.3,
 		Brightness = 1.4,
 		ExposureCompensation = 0,
-		Ambient = Color3.fromRGB(70, 60, 115),
-		OutdoorAmbient = Color3.fromRGB(90, 80, 150),
+		Ambient = UIKit.Theme.Currency.Fish.Base,
+		OutdoorAmbient = UIKit.Theme.Currency.Fish.Base,
 		EnvironmentDiffuseScale = 0.4,
 		EnvironmentSpecularScale = 0.6,
 	},
-	Atmosphere = { Density = 0.32, Color = Color3.fromRGB(70, 60, 130), Decay = Color3.fromRGB(30, 20, 70), Glare = 0, Haze = 1.6, Offset = 0.2 },
+	Atmosphere = { Density = 0.32, Color = UIKit.Theme.Currency.Fish.Base, Decay = UIKit.Theme.Currency.Fish.Base, Glare = 0, Haze = 1.6, Offset = 0.2 },
 	BloomEffect = { Intensity = 0.6, Size = 24, Threshold = 1.25 },
-	ColorCorrectionEffect = { Saturation = 0.28, Contrast = 0.1, Brightness = 0, TintColor = Color3.fromRGB(215, 210, 255) },
+	ColorCorrectionEffect = { Saturation = 0.28, Contrast = 0.1, Brightness = 0, TintColor = UIKit.Theme.Currency.Fish.Base },
 }
 
 -- 🩸 the Blood Rift (Ascension): everything red, dark and hazy
@@ -52,14 +53,14 @@ local BLOOD = {
 		ClockTime = 17.6, -- a low, dying sun under the red haze
 		Brightness = 1.6,
 		ExposureCompensation = 0.1,
-		Ambient = Color3.fromRGB(140, 45, 50),
-		OutdoorAmbient = Color3.fromRGB(170, 60, 64),
+		Ambient = UIKit.Theme.Colors.Danger.Base,
+		OutdoorAmbient = UIKit.Theme.Colors.Danger.Base,
 		EnvironmentDiffuseScale = 0.3,
 		EnvironmentSpecularScale = 0.5,
 	},
-	Atmosphere = { Density = 0.47, Color = Color3.fromRGB(170, 30, 36), Decay = Color3.fromRGB(90, 10, 16), Glare = 0.5, Haze = 2.6, Offset = 0.1 },
+	Atmosphere = { Density = 0.47, Color = UIKit.Theme.Colors.Danger.Base, Decay = UIKit.Theme.Colors.Danger.Base, Glare = 0.5, Haze = 2.6, Offset = 0.1 },
 	BloomEffect = { Intensity = 0.7, Size = 26, Threshold = 1.2 },
-	ColorCorrectionEffect = { Saturation = 0.15, Contrast = 0.18, Brightness = -0.02, TintColor = Color3.fromRGB(255, 175, 175) },
+	ColorCorrectionEffect = { Saturation = 0.15, Contrast = 0.18, Brightness = -0.02, TintColor = UIKit.Theme.Colors.Primary.Base },
 }
 
 local function capture()
@@ -131,68 +132,8 @@ local activeCard: CanvasGroup? = nil
 -- Small "Entering" banner at the top of the screen (kept compact so it never
 -- covers the play area).
 local function titleCard(zoneId: string)
-	local zone = ZoneConfig.ById[zoneId]
-	if not zone then return end
-	if activeCard then activeCard:Destroy() end
-
-	local card = Instance.new("CanvasGroup")
-	card.Name = "AreaBanner"
-	card.AnchorPoint = Vector2.new(0.5, 0)
-	card.Position = UDim2.new(0.5, 0, 0, 58)
-	card.Size = UDim2.fromOffset(340, 78)
-	card.BackgroundColor3 = DARK
-	card.BackgroundTransparency = 0.3
-	card.GroupTransparency = 1
-	card.Parent = gui
-	activeCard = card
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 18)
-	corner.Parent = card
-	local edge = Instance.new("UIStroke")
-	edge.Thickness = 2
-	edge.Color = zone.Color:Lerp(Color3.new(1, 1, 1), 0.3)
-	edge.Transparency = 0.2
-	edge.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	edge.Parent = card
-	local scale = Instance.new("UIScale")
-	local vp = workspace.CurrentCamera.ViewportSize
-	scale.Scale = math.clamp(vp.X / 1000, 0.72, 1)
-	scale.Parent = card
-
-	local function text(y: number, h: number, str: string, color: Color3, strokeT: number?)
-		local l = Instance.new("TextLabel")
-		l.BackgroundTransparency = 1
-		l.Position = UDim2.fromOffset(12, y)
-		l.Size = UDim2.new(1, -24, 0, h)
-		l.Font = Enum.Font.FredokaOne
-		l.TextScaled = true
-		l.Text = str
-		l.TextColor3 = color
-		l.Parent = card
-		if strokeT then stroke(l, strokeT) end
-		return l
-	end
-	text(6, 14, "E N T E R I N G", zone.Color:Lerp(Color3.new(1, 1, 1), 0.45))
-	local title = text(20, 32, zone.Icon .. " " .. zone.Name .. " " .. zone.Icon, Color3.new(1, 1, 1), 2)
-	local grad = Instance.new("UIGradient")
-	grad.Color = ColorSequence.new(Color3.new(1, 1, 1), zone.Color:Lerp(Color3.new(1, 1, 1), 0.25))
-	grad.Rotation = 90
-	grad.Parent = title
-	text(54, 17, zone.Subtitle or zone.KGMultiplier > 1
-		and ("x" .. NumberFormat.Format(zone.KGMultiplier) .. " KG  •  x" .. NumberFormat.Format(zone.LuckMultiplier) .. " Luck  •  New sushi!")
-		or "Upgrades, Market & Rebirth Shrine", Color3.fromRGB(255, 232, 160))
-
-	local inInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	card.Position = UDim2.new(0.5, 0, 0, 44)
-	TweenService:Create(card, inInfo, { GroupTransparency = 0, Position = UDim2.new(0.5, 0, 0, 58) }):Play()
-	task.delay(2.6, function()
-		if activeCard ~= card then return end
-		local outInfo = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		TweenService:Create(card, outInfo, { GroupTransparency = 1, Position = UDim2.new(0.5, 0, 0, 46) }):Play()
-		task.wait(0.45)
-		if activeCard == card then activeCard = nil end
-		card:Destroy()
-	end)
+ local zone=ZoneConfig.ById[zoneId]
+ if zone then UIKit.Toast("Entering "..zone.Name.." • "..(zone.Subtitle or "Fresh sushi awaits!"),zone.Color) end
 end
 
 -- ===== portal signs =====
@@ -230,9 +171,9 @@ local function buildPortalSign(portal)
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 1)
-	label.Font = Enum.Font.FredokaOne
+	label.Font = UIKit.Font
 	label.TextScaled = true
-	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextColor3 = UIKit.Theme.White
 	label.Parent = bb
 	stroke(label, 3)
 	portal.Label = label
@@ -248,10 +189,10 @@ local function refreshSigns()
 			local open, lockText = ZoneConfig.IsUnlocked(zone, attr)
 			if open then
 				portal.Label.Text = "Walk in to travel!"
-				portal.Label.TextColor3 = Color3.fromRGB(140, 255, 140)
+				portal.Label.TextColor3 = UIKit.Theme.Colors.Success.Base
 			else
 				portal.Label.Text = lockText
-				portal.Label.TextColor3 = Color3.fromRGB(255, 150, 150)
+				portal.Label.TextColor3 = UIKit.Theme.Colors.Primary.Base
 			end
 		end
 	end
@@ -286,6 +227,7 @@ local function travel(zoneId: string)
 	local t0 = os.clock()
 	repeat task.wait() until arrived or os.clock() - t0 > 2
 	conn:Disconnect()
+	if not arrived then UIKit.Toast("Travel unavailable. Move closer to the portal and try again.",UIKit.Theme.Colors.Danger.Base) end
 	if arrived then
 		updateLighting(true) -- swap the look while the screen is black
 		ZoneController.FaceForward()
@@ -298,6 +240,12 @@ local function travel(zoneId: string)
 	fade.Visible = false
 	cooldownUntil = os.clock() + 2
 	traveling = false
+end
+
+function ZoneController.TravelTo(zoneId)
+	if traveling or os.clock() < cooldownUntil then return end
+	if not ZoneConfig.ById[zoneId] then return end
+	task.spawn(travel, zoneId)
 end
 
 local function step()
@@ -416,7 +364,7 @@ function ZoneController.Init()
 	fade = Instance.new("Frame")
 	fade.Name = "Fade"
 	fade.Size = UDim2.fromScale(1, 1)
-	fade.BackgroundColor3 = Color3.fromRGB(10, 6, 20)
+	fade.BackgroundColor3 = UIKit.Theme.Colors.Rice.Dark
 	fade.BackgroundTransparency = 1
 	fade.Visible = false
 	fade.ZIndex = 50
@@ -428,9 +376,9 @@ function ZoneController.Init()
 	toast.AnchorPoint = Vector2.new(0.5, 0.5)
 	toast.Position = UDim2.fromScale(0.5, 0.62)
 	toast.Size = UDim2.fromScale(0.6, 0.05)
-	toast.Font = Enum.Font.FredokaOne
+	toast.Font = UIKit.Font
 	toast.TextScaled = true
-	toast.TextColor3 = Color3.fromRGB(255, 200, 200)
+	toast.TextColor3 = UIKit.Theme.Colors.Primary.Base
 	toast.TextTransparency = 1
 	toast.Parent = gui
 	toastStroke = stroke(toast, 3)

@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- SlashController: the katana in Sushi Slashing.
 --  * everyone in the Slashing area holds a katana in both hands, gripped like the fishing
 --    rod: one hand on each side of the handle, elbows out, so the hands never clip
@@ -14,7 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local CollectionService = game:GetService("CollectionService")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local Debris = game:GetService("Debris")
 
 local EffectsController = require(script.Parent.EffectsController)
@@ -73,9 +74,9 @@ local POLE_L = Vector3.new(-1, -0.15, 0.2).Unit
 local SOUND_WHOOSH = "rbxasset://sounds/swordslash.wav"
 local SOUND_UNSHEATH = "rbxasset://sounds/unsheath.wav"
 local SOUND_HIT = "rbxasset://sounds/impact_water.mp3"
-local WHITE = Color3.new(1, 1, 1)
-local GOLD = Color3.fromRGB(255, 210, 60)
-local SLASH_FX = Color3.fromRGB(255, 240, 220)
+local WHITE = UIKit.Theme.White
+local GOLD = UIKit.Theme.Colors.Primary.Base
+local SLASH_FX = UIKit.Theme.Colors.Primary.Light
 
 local function ease(kind: string?, a: number): number
 	if kind == "in" then
@@ -312,7 +313,7 @@ local function create(plr: Player, char: Model)
 		Pose = table.clone(READY), Vel = table.create(N, 0),
 		Keys = nil, T = 0, NextSide = 1, Queued = false, SwingId = 0, HitDone = true,
 	}
-	EffectsController.Burst((hand :: BasePart).Position, Color3.fromRGB(220, 235, 255), 10)
+	EffectsController.Burst((hand :: BasePart).Position, UIKit.Theme.Currency.Fish.Base, 10)
 	playSound(grip, SOUND_UNSHEATH, 0.5, 1.1)
 	return s
 end

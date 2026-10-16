@@ -11,6 +11,7 @@ local order = {
 	"SettingsController",
 	"SkillTreeUIController",
 	"RunesMenuController",
+	"AreasController",
 	"MenuButtonsController",
 	"BoardsController",
 	"FishingController",
@@ -27,6 +28,9 @@ local order = {
 	"TutorialController",
 	"AscensionController",
 	"AdminController",
+	"WorldUIController",
+	"MinigameHUDController",
+	"UIShowcaseController",
 	"SushiController", -- last: tells the server we're ready for sushi
 }
 

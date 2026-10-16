@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- AscensionController: the Blood Altar in the Blood Rift.
 -- * walking up onto the altar shows a confirm panel (what resets, what you keep, the reward)
 -- * confirming plays the Ascension: the screen floods red, fades to black with
@@ -6,7 +7,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -18,13 +19,14 @@ local player = Players.LocalPlayer
 
 local AscensionController = {}
 
-local C = Color3.fromRGB
-local FONT = Enum.Font.FredokaOne
-local RED = C(255, 70, 70)
-local DARK = C(20, 6, 9)
-local GOOD = C(140, 255, 150)
-local BAD = C(255, 150, 150)
+local FONT = UIKit.Font
+local RED = UIKit.Theme.Colors.Danger.Base
+local DARK = UIKit.Theme.Ink
+local GOOD = UIKit.Theme.Colors.Success.Base
+local BAD = UIKit.Theme.Colors.Primary.Base
 
+local window=nil
+local MenuManager=require(script.Parent.MenuManager)
 local gui: ScreenGui
 local panel: Frame
 local panelScale: UIScale
@@ -44,24 +46,24 @@ local function new(class: string, props, parent: Instance?)
 end
 
 local function stroke(parent, thickness: number, color: Color3?)
-	return new("UIStroke", { Thickness = thickness, Color = color or C(10, 0, 2), LineJoinMode = Enum.LineJoinMode.Round }, parent)
+	return new("UIStroke", { Thickness = thickness, Color = color or UIKit.Theme.Ink, LineJoinMode = Enum.LineJoinMode.Round }, parent)
 end
 
 local function label(parent, props)
-	local t = new("TextLabel", { BackgroundTransparency = 1, Font = FONT, TextScaled = true, RichText = true, TextColor3 = C(255, 255, 255) }, parent)
+	local t = new("TextLabel", { BackgroundTransparency = 1, Font = FONT, TextScaled = true, RichText = true, TextColor3 = UIKit.Theme.White }, parent)
 	for k, v in pairs(props) do (t :: any)[k] = v end
 	stroke(t, 2)
 	return t
 end
 
 local function button(parent, text: string, colorA: Color3, colorB: Color3, props, onClick)
-	local b = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = C(255, 255, 255) }, parent)
+	local b = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = UIKit.Theme.White }, parent)
 	for k, v in pairs(props) do (b :: any)[k] = v end
 	new("UICorner", { CornerRadius = UDim.new(0, 12) }, b)
 	local s = stroke(b, 3)
 	s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(colorA, colorB) }, b)
-	label(b, { Text = text, Size = UDim2.new(1, -16, 1, -12), Position = UDim2.fromOffset(8, 6) })
+	label(b, { Text = text, Size = UIKit.Theme.Layout.AscensionController.Size1, Position = UDim2.fromOffset(8, 6) })
 	local sc = new("UIScale", {}, b)
 	b.MouseEnter:Connect(function() TweenService:Create(sc, TweenInfo.new(0.12), { Scale = 1.06 }):Play() end)
 	b.MouseLeave:Connect(function() TweenService:Create(sc, TweenInfo.new(0.12), { Scale = 1 }):Play() end)
@@ -82,28 +84,18 @@ end
 -- ===== confirm panel =====
 
 local function buildPanel()
-	panel = new("Frame", {
-		Name = "AscendPanel", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(420, 330), BackgroundColor3 = C(30, 8, 12), BackgroundTransparency = 0.05, Visible = false,
-	}, gui)
-	new("UICorner", { CornerRadius = UDim.new(0, 24) }, panel)
-	local ps = stroke(panel, 4, C(170, 25, 35))
-	ps.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	panelScale = new("UIScale", {}, panel)
-	label(panel, { Text = "🩸 ASCEND? 🩸", TextColor3 = RED, Position = UDim2.fromOffset(20, 14), Size = UDim2.new(1, -40, 0, 42) })
-	ui.Lose = label(panel, { Position = UDim2.fromOffset(24, 66), Size = UDim2.new(1, -48, 0, 44), TextWrapped = true,
-		Text = '<font color="#FF9696">You lose:</font> Cash, Sushi KG, Cash Upgrades and your Skill Tree' })
-	ui.Keep = label(panel, { Position = UDim2.fromOffset(24, 114), Size = UDim2.new(1, -48, 0, 44), TextWrapped = true,
-		Text = '<font color="#8CFF96">You keep:</font> Rebirths, Prestiges, Automation and your Index' })
-	ui.Reward = label(panel, { Position = UDim2.fromOffset(24, 166), Size = UDim2.new(1, -48, 0, 34), TextColor3 = C(255, 215, 120) })
-	ui.Lock = label(panel, { Position = UDim2.fromOffset(24, 204), Size = UDim2.new(1, -48, 0, 24), TextColor3 = BAD, Visible = false })
-	ui.Yes = button(panel, "ASCEND", C(255, 90, 90), C(190, 20, 35), { Position = UDim2.new(0.5, -190, 1, -84), Size = UDim2.fromOffset(200, 60) }, function()
-		AscensionController.Ascend()
-	end)
-	button(panel, "Not yet", C(120, 110, 120), C(80, 70, 82), { Position = UDim2.new(0.5, 24, 1, -84), Size = UDim2.fromOffset(166, 60) }, function()
-		dismissedUntil = os.clock() + 6
-		AscensionController.SetOpen(false)
-	end)
+ window=UIKit.Window({Name="BloodAltar",Title="Ascend?",Icon="🩸",Size = UIKit.Theme.Layout.AscensionController.Size2,DisplayOrder=55})
+ panel=window.Frame;panelScale=panel:FindFirstChildOfClass("UIScale")
+ local body=window.Body
+ local textList=UIKit.List(body);textList.Size=UDim2.new(1,0,1,-88)
+ ui.Lose=UIKit.Label(textList,{Text="LOSE: Cash, KG, Cash upgrades and skill tree",TextXAlignment=Enum.TextXAlignment.Left,LayoutOrder=1,TextScaled=false,TextSize=UIKit.Theme.Text.Body,AutomaticSize=Enum.AutomaticSize.Y,Size=UDim2.new(1,-16,0,0)},0)
+ ui.Keep=UIKit.Label(textList,{Text="KEEP: Rebirths, Prestiges, runes, automation and Index",TextXAlignment=Enum.TextXAlignment.Left,LayoutOrder=2,TextScaled=false,TextSize=UIKit.Theme.Text.Body,AutomaticSize=Enum.AutomaticSize.Y,Size=UDim2.new(1,-16,0,0)},0)
+ ui.Reward=UIKit.Label(textList,{Text="",Size = UIKit.Theme.Layout.AscensionController.Size5,LayoutOrder=3,TextScaled=false,TextSize=UIKit.Theme.Text.Body,AutomaticSize=Enum.AutomaticSize.Y,Size=UDim2.new(1,-16,0,0)},0)
+ ui.Lock=UIKit.Label(textList,{Text="",TextColor3=UIKit.Theme.Colors.Danger.Dark,LayoutOrder=4,TextScaled=false,TextSize=UIKit.Theme.Text.Body,AutomaticSize=Enum.AutomaticSize.Y,Size=UDim2.new(1,-16,0,0)},0)
+ local yes=UIKit.Danger(body,{Label="ASCEND",Position=UDim2.new(0,12,1,-72),Size = UIKit.Theme.Layout.AscensionController.Size7},function() AscensionController.Ascend() end)
+ ui.Yes=yes.Button
+ UIKit.Secondary(body,{Label="Not yet",Position=UDim2.new(0.55,6,1,-72),Size = UIKit.Theme.Layout.AscensionController.Size8},function() dismissedUntil=os.clock()+6;AscensionController.SetOpen(false) end)
+ table.insert(window.OnClose,function() open=false;dismissedUntil=os.clock()+6 end)
 end
 
 function AscensionController.SetOpen(want: boolean)
@@ -116,14 +108,14 @@ function AscensionController.SetOpen(want: boolean)
 		ui.Lock.Visible = not ok
 		ui.Lock.Text = "🔒 You need " .. AscensionConfig.RequiredNodeName .. " in the Skill Tree"
 		ui.Yes.Visible = ok
-		panel.Visible = true
+		window.Open()
 		local vp = workspace.CurrentCamera.ViewportSize
 		local base = math.clamp(math.min(vp.X / 1300, vp.Y / 800), 0.7, 1.1)
-		panelScale.Scale = base * 0.6
-		TweenService:Create(panelScale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = base }):Play()
+		panelScale.Scale = 1
+		-- Shared window owns layout and motion.
 		EffectsController.PlaySound("RareSpawn", 0.5)
 	else
-		panel.Visible = false
+		window.Close()
 	end
 end
 
@@ -133,18 +125,20 @@ function AscensionController.Ascend()
 	if busy then return end
 	busy = true
 	AscensionController.SetOpen(false)
-	local ok, count = Remotes.RequestAscend:InvokeServer()
+	local transport, ok, count = pcall(function() return Remotes.RequestAscend:InvokeServer() end)
+	if not transport then busy=false;UIKit.Toast("Ascension unavailable. Please try again.",UIKit.Theme.Colors.Danger.Base);return end
 	if not ok then
 		busy = false
 		return
 	end
 	EffectsController.PlaySound("Upgrade", 0.6)
 	EffectsController.CameraPunch(8)
+	if UIKit.ReducedMotion() then UIKit.Celebrate("ASCENDED", "+1 Ascension Point",UIKit.Theme.Currency.AscensionPoints.Base);busy=false;return end
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if root then EffectsController.Burst(root.Position, RED, 60) end
 	-- flood the screen red, then black with the title
 	overlay.Visible = true
-	overlay.BackgroundColor3 = C(255, 40, 40)
+	overlay.BackgroundColor3 = UIKit.Theme.Colors.Danger.Base
 	overlay.BackgroundTransparency = 1
 	bigText.TextTransparency = 1
 	subText.TextTransparency = 1
@@ -152,7 +146,7 @@ function AscensionController.Ascend()
 	subText.Text = "Ascension #" .. tostring(count) .. "  •  +1 Ascension Point"
 	TweenService:Create(overlay, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { BackgroundTransparency = 0 }):Play()
 	task.wait(1.1)
-	TweenService:Create(overlay, TweenInfo.new(0.8), { BackgroundColor3 = C(10, 0, 3) }):Play()
+	TweenService:Create(overlay, TweenInfo.new(0.8), { BackgroundColor3 = UIKit.Theme.Colors.Rice.Dark }):Play()
 	TweenService:Create(bigText, TweenInfo.new(0.6), { TextTransparency = 0 }):Play()
 	task.delay(0.3, function() TweenService:Create(subText, TweenInfo.new(0.6), { TextTransparency = 0 }):Play() end)
 	-- wait for the server to send us home
@@ -216,7 +210,7 @@ local function step()
 	local pivot = a:GetPivot().Position
 	local off = root.Position - pivot
 	local onTop = Vector3.new(off.X, 0, off.Z).Magnitude <= AscensionConfig.AltarRadius and off.Y > 3
-	if onTop and not open and os.clock() > dismissedUntil then
+	if onTop and not open and not MenuManager.Current() and os.clock() > dismissedUntil then
 		AscensionController.SetOpen(true)
 	elseif not onTop and open then
 		AscensionController.SetOpen(false)
@@ -226,8 +220,8 @@ end
 function AscensionController.Init()
 	gui = new("ScreenGui", { Name = "Ascension", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 20 }, player:WaitForChild("PlayerGui"))
 	overlay = new("Frame", { Name = "Overlay", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 10 }, gui)
-	bigText = label(overlay, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.fromScale(0.6, 0.1), TextColor3 = C(255, 90, 90), TextTransparency = 1, ZIndex = 11 })
-	subText = label(overlay, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.54), Size = UDim2.fromScale(0.45, 0.045), TextColor3 = C(255, 215, 150), TextTransparency = 1, ZIndex = 11 })
+	bigText = label(overlay, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.fromScale(0.6, 0.1), TextColor3 = UIKit.Theme.Colors.Danger.Base, TextTransparency = 1, ZIndex = 11 })
+	subText = label(overlay, { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.54), Size = UDim2.fromScale(0.45, 0.045), TextColor3 = UIKit.Theme.Colors.Primary.Light, TextTransparency = 1, ZIndex = 11 })
 	buildPanel()
 	RunService.RenderStepped:Connect(step)
 	UserInputService.InputBegan:Connect(function(input, processed)

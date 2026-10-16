@@ -1,1 +1,1 @@
-w
+-- Reserved for a future loading screen. UI currently boots through ClientMain.

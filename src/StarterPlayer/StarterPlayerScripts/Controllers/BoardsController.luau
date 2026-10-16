@@ -1,3 +1,4 @@
+local UIKit = require(script.Parent.UIKit)
 -- BoardsController: the incremental-style boards in the world.
 --   💵 Cash Upgrades  |  ⭐ Prestige wall (scrolls sideways)  |  🔄 Rebirth   (+ the market "Converter")
 --   🤖 Automation wall (scrolls sideways)
@@ -9,7 +10,7 @@
 -- All purchases go through the server-validated remotes.
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local TweenService = UIKit.TweenService
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -37,24 +38,24 @@ local player = Players.LocalPlayer
 local BoardsController = {}
 
 -- ===== theme =====
-local FONT = Enum.Font.FredokaOne
-local WHITE = Color3.new(1, 1, 1)
-local OUTLINE = Color3.fromRGB(14, 14, 20)
-local PANEL = Color3.fromRGB(34, 36, 44)
-local GREY_TEXT = Color3.fromRGB(190, 194, 210)
-local CASH = Color3.fromRGB(90, 255, 110)
-local RED = Color3.fromRGB(255, 75, 95)
-local GOLD = Color3.fromRGB(255, 215, 70)
-local KG = Color3.fromRGB(255, 180, 80)
-local ASC = Color3.fromRGB(255, 95, 95)
-local FISH = Color3.fromRGB(110, 200, 255)
-local SLICE = Color3.fromRGB(255, 140, 170)
+local FONT = UIKit.Font
+local WHITE = UIKit.Theme.White
+local OUTLINE = UIKit.Theme.Ink
+local PANEL = UIKit.Theme.Colors.Rice.Dark
+local GREY_TEXT = UIKit.Theme.Muted
+local CASH = UIKit.Theme.Currency.Money.Base
+local RED = UIKit.Theme.Currency.TotalRebirths.Base
+local GOLD = UIKit.Theme.Currency.Prestiges.Base
+local KG = UIKit.Theme.Currency.KG.Base
+local ASC = UIKit.Theme.Currency.AscensionPoints.Base
+local FISH = UIKit.Theme.Currency.Fish.Base
+local SLICE = UIKit.Theme.Currency.Slices.Base
 
 local SEQ = {
-	Green = ColorSequence.new(Color3.fromRGB(125, 245, 100), Color3.fromRGB(50, 180, 60)),
-	Red = ColorSequence.new(Color3.fromRGB(255, 120, 150), Color3.fromRGB(220, 45, 85)),
-	Yellow = ColorSequence.new(Color3.fromRGB(255, 235, 100), Color3.fromRGB(245, 175, 30)),
-	Grey = ColorSequence.new(Color3.fromRGB(150, 150, 158), Color3.fromRGB(105, 105, 112)),
+	Green = ColorSequence.new(UIKit.Theme.Colors.Success.Base, UIKit.Theme.Colors.Success.Base),
+	Red = ColorSequence.new(UIKit.Theme.Colors.Primary.Base, UIKit.Theme.Colors.Danger.Base),
+	Yellow = ColorSequence.new(UIKit.Theme.Colors.Accent.Base, UIKit.Theme.Colors.Primary.Base),
+	Grey = ColorSequence.new(UIKit.Theme.Muted, UIKit.Theme.Muted),
 }
 
 -- ===== layout (pixels; boards are drawn at 40 px per stud) =====
@@ -105,7 +106,7 @@ local function stroke(parent, thickness, border: boolean?)
 end
 
 local function label(parent, props, strokeThickness)
-	local t = new("TextLabel", { BackgroundTransparency = 1, Font = FONT, TextScaled = true, RichText = true, TextColor3 = WHITE }, parent)
+	local t = new("TextLabel", { BackgroundTransparency = 1, Font = FONT, TextScaled = true, RichText = true, TextColor3 = UIKit.Theme.Ink }, parent)
 	for k, v in pairs(props) do (t :: any)[k] = v end
 	stroke(t, strokeThickness or 2.5)
 	return t
@@ -121,6 +122,7 @@ local function pop(obj: GuiObject, amount: number)
 end
 
 local function shake(obj: GuiObject)
+	if UIKit.ReducedMotion() then UIKit.Sound("Error"); return end
 	local p = obj.Position
 	task.spawn(function()
 		for _, dx in ipairs({ -6, 6, -4, 4, 0 }) do
@@ -129,10 +131,11 @@ local function shake(obj: GuiObject)
 		end
 		obj.Position = p
 	end)
-	EffectsController.PlaySound("UIClick", 0.6)
+	UIKit.Sound("Error")
 end
 
 local function flash(frame: Frame, color: Color3)
+	color=UIKit.Theme.Colors.Success.Base
 	local f = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = color, BackgroundTransparency = 0.45, ZIndex = 20 }, frame)
 	new("UICorner", { CornerRadius = UDim.new(0, 14) }, f)
 	TweenService:Create(f, TweenInfo.new(0.4), { BackgroundTransparency = 1 }):Play()
@@ -140,19 +143,13 @@ local function flash(frame: Frame, color: Color3)
 end
 
 local function button(parent, props, onClick)
-	local b = new("TextButton", { Text = "", AutoButtonColor = false, BackgroundColor3 = WHITE }, parent)
-	for k, v in pairs(props) do (b :: any)[k] = v end
-	new("UICorner", { CornerRadius = UDim.new(0, 8) }, b)
-	stroke(b, 2.5, true)
-	local g = new("UIGradient", { Rotation = 90, Color = SEQ.Green }, b)
-	new("UIScale", { Name = "PopScale" }, b)
-	local lbl = label(b, { Size = UDim2.new(1, -8, 1, -6), Position = UDim2.fromOffset(4, 3) }, 2)
-	buttonHandlers[b] = function()
-		pop(b, 0.85)
-		EffectsController.PlaySound("UIClick")
-		onClick(b)
-	end
-	return { Button = b, Gradient = g, Label = lbl }
+ props.Label="";props.Variant="Success";props.NoSound=true
+ local api=UIKit.Button(parent,props)
+ buttonHandlers[api.Button]=function()
+  if api.Button:GetAttribute("Disabled") then return end
+  UIKit.SetInteraction(api.Button,"Pressed");UIKit.Sound("Click");task.delay(0.06,function() UIKit.SetInteraction(api.Button,"Normal") end);onClick(api.Button)
+ end
+ return api
 end
 
 local function setButton(btn, seq: ColorSequence, txt: string, visible: boolean?)
@@ -172,19 +169,19 @@ local function panel(parent, width: number, height: number, y: number, title: st
 		BackgroundTransparency = 0.04,
 	}, parent)
 	new("UICorner", { CornerRadius = UDim.new(0, 26) }, p)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(52, 56, 70), Color3.fromRGB(28, 30, 38)) }, p)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(UIKit.Theme.Colors.Rice.Dark, UIKit.Theme.Colors.Rice.Dark) }, p)
 	local st = stroke(p, 4, true)
 	st.Color = mix(OUTLINE, titleColor, 0.35)
 	-- header ribbon behind the title
 	local ribbon = new("Frame", {
-		Name = "Ribbon", Position = UDim2.fromOffset(12, 7), Size = UDim2.new(1, -24, 0, 34),
+		Name = "Ribbon", Position = UDim2.fromOffset(12, 7), Size = UIKit.Theme.Layout.BoardsController.Size1,
 		BackgroundColor3 = titleColor, BackgroundTransparency = 0.8, ZIndex = 0,
 	}, p)
 	new("UICorner", { CornerRadius = UDim.new(0, 14) }, ribbon)
 	new("UIGradient", {
 		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 0.6) }),
 	}, ribbon)
-	label(p, { Name = "Title", Text = title, TextColor3 = titleColor, Size = UDim2.new(1, -40, 0, 32), Position = UDim2.fromOffset(20, 8) }, 3)
+	label(p, { Name = "Title", Text = title, TextColor3 = titleColor, Size = UIKit.Theme.Layout.BoardsController.Size2, Position = UDim2.fromOffset(20, 8) }, 3)
 	return p
 end
 
@@ -198,10 +195,10 @@ local function pill(parent, width: number, icon: string, color: Color3)
 		BackgroundTransparency = 0.04,
 	}, parent)
 	new("UICorner", { CornerRadius = UDim.new(0, 16) }, f)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(52, 56, 70), Color3.fromRGB(28, 30, 38)) }, f)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(UIKit.Theme.Colors.Rice.Dark, UIKit.Theme.Colors.Rice.Dark) }, f)
 	stroke(f, 3.5, true).Color = mix(OUTLINE, color, 0.35)
-	label(f, { Text = icon, Size = UDim2.fromOffset(40, 40), Position = UDim2.fromOffset(12, 6) }, 0)
-	return label(f, { Name = "Amount", TextColor3 = color, Size = UDim2.new(1, -66, 0, 36), Position = UDim2.fromOffset(56, 8), TextXAlignment = Enum.TextXAlignment.Left }, 3)
+	label(f, { Text = icon, Size = UIKit.Theme.Layout.BoardsController.Size3, Position = UDim2.fromOffset(12, 6) }, 0)
+	return label(f, { Name = "Amount", TextColor3 = color, Size = UIKit.Theme.Layout.BoardsController.Size4, Position = UDim2.fromOffset(56, 8), TextXAlignment = Enum.TextXAlignment.Left }, 3)
 end
 
 -- ===== data helpers =====
@@ -290,24 +287,24 @@ local function makeCard(parent, index: number, kind: string, def)
 	-- card background
 	local bg = new("Frame", { Name = "Bg", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, ZIndex = 0 }, f)
 	new("UICorner", { CornerRadius = UDim.new(0, 16) }, bg)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(64, 68, 84), Color3.fromRGB(40, 43, 54)) }, bg)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(UIKit.Theme.Colors.Rice.Dark, UIKit.Theme.Colors.Rice.Dark) }, bg)
 	c.Stroke = stroke(bg, 3, true)
-	label(f, { Text = def.Name, TextColor3 = accent, Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, 6) })
-	c.Level = label(f, { Size = UDim2.new(1, -12, 0, 17), Position = UDim2.fromOffset(6, 31), TextColor3 = GREY_TEXT }, 2)
+	label(f, { Text = def.Name, TextColor3 = accent, Size = UIKit.Theme.Layout.BoardsController.Size5, Position = UDim2.fromOffset(6, 6) })
+	c.Level = label(f, { Size = UIKit.Theme.Layout.BoardsController.Size6, Position = UDim2.fromOffset(6, 31), TextColor3 = GREY_TEXT }, 2)
 	-- icon on a round badge
-	local badge = new("Frame", { Name = "Badge", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 51), Size = UDim2.fromOffset(62, 62), BackgroundColor3 = Color3.fromRGB(28, 30, 38) }, f)
+	local badge = new("Frame", { Name = "Badge", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 51), Size = UIKit.Theme.Layout.BoardsController.Size7, BackgroundColor3 = UIKit.Theme.Muted }, f)
 	new("UICorner", { CornerRadius = UDim.new(1, 0) }, badge)
 	c.BadgeStroke = new("UIStroke", { Thickness = 2.5, Color = accent, Transparency = 0.35, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, badge)
-	label(badge, { Text = def.Icon, Size = UDim2.new(1, -10, 1, -10), Position = UDim2.fromOffset(5, 5) }, 0)
+	label(badge, { Text = def.Icon, Size = UIKit.Theme.Layout.BoardsController.Size8, Position = UDim2.fromOffset(5, 5) }, 0)
 	-- level progress bar
-	local bar = new("Frame", { Name = "Bar", Position = UDim2.fromOffset(16, 119), Size = UDim2.new(1, -32, 0, 7), BackgroundColor3 = Color3.fromRGB(22, 24, 30) }, f)
+	local bar = new("Frame", { Name = "Bar", Position = UDim2.fromOffset(16, 119), Size = UIKit.Theme.Layout.BoardsController.Size9, BackgroundColor3 = UIKit.Theme.Muted }, f)
 	new("UICorner", { CornerRadius = UDim.new(1, 0) }, bar)
 	c.BarFill = new("Frame", { Name = "Fill", Size = UDim2.fromScale(0, 1), BackgroundColor3 = accent, BorderSizePixel = 0 }, bar)
 	new("UICorner", { CornerRadius = UDim.new(1, 0) }, c.BarFill)
-	c.Value = label(f, { Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, 130), TextColor3 = WHITE }, 3)
-	c.Cost = label(f, { Size = UDim2.new(1, -14, 0, 18), Position = UDim2.fromOffset(7, 157) }, 2)
+	c.Value = label(f, { Size = UIKit.Theme.Layout.BoardsController.Size10, Position = UDim2.fromOffset(6, 130), TextColor3 = WHITE }, 3)
+	c.Cost = label(f, { Size = UIKit.Theme.Layout.BoardsController.Size11, Position = UDim2.fromOffset(7, 157) }, 2)
 	c.Accent = accent
-	c.Buy = button(f, { Position = UDim2.fromOffset(6, 180), Size = UDim2.fromOffset(74, 34) }, function()
+	c.Buy = button(f, { Position = UDim2.fromOffset(6, 180), Size = UIKit.Theme.Layout.BoardsController.Size12 }, function()
 		if def.Toggle and KINDS[kind].Config.GetCost(def.Id, KINDS[kind].Level(def.Id)) == nil then
 			local attr = "Set_" .. def.Toggle
 			Remotes.SetSetting:FireServer(def.Toggle, player:GetAttribute(attr) == false)
@@ -315,19 +312,19 @@ local function makeCard(parent, index: number, kind: string, def)
 		end
 		tryBuy(kind, def.Id, false, f)
 	end)
-	c.Max = button(f, { Position = UDim2.fromOffset(88, 180), Size = UDim2.fromOffset(76, 34) }, function() tryBuy(kind, def.Id, true, f) end)
-	c.Maxed = label(f, { Text = "⭐ MAXED ⭐", TextColor3 = GOLD, Size = UDim2.new(1, -16, 0, 30), Position = UDim2.fromOffset(8, 182), Visible = false }, 3)
+	c.Max = button(f, { Position = UDim2.fromOffset(88, 180), Size = UIKit.Theme.Layout.BoardsController.Size13 }, function() tryBuy(kind, def.Id, true, f) end)
+	c.Maxed = label(f, { Text = "⭐ MAXED ⭐", TextColor3 = GOLD, Size = UIKit.Theme.Layout.BoardsController.Size14, Position = UDim2.fromOffset(8, 182), Visible = false }, 3)
 	if def.RequiredRebirths then
 		-- shown on top of the card until you reach that Rebirth
-		local lock = new("Frame", { Name = "Lock", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(26, 28, 36), BackgroundTransparency = 0.04, ZIndex = 5, Visible = false }, f)
+		local lock = new("Frame", { Name = "Lock", Size = UDim2.fromScale(1, 1), BackgroundColor3 = UIKit.Theme.Muted, BackgroundTransparency = 0.04, ZIndex = 5, Visible = false }, f)
 		new("UICorner", { CornerRadius = UDim.new(0, 16) }, lock)
-		new("UIStroke", { Thickness = 3, Color = Color3.fromRGB(16, 17, 22), ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, lock)
-		label(lock, { Text = "Rebirth Required:", ZIndex = 6, Size = UDim2.new(1, -12, 0, 22), Position = UDim2.fromOffset(6, 12) }, 2)
-		label(lock, { Text = tostring(def.RequiredRebirths), TextColor3 = RED, ZIndex = 6, Size = UDim2.new(1, -12, 0, 30), Position = UDim2.fromOffset(6, 36) }, 3)
-		label(lock, { Text = "🔒", ZIndex = 6, Size = UDim2.fromOffset(56, 56), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 72) }, 0)
-		label(lock, { Text = "Unlocks:", ZIndex = 6, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -12, 0, 18), Position = UDim2.fromOffset(6, 136) }, 2)
-		label(lock, { Text = def.Icon .. " " .. def.Name, ZIndex = 6, TextColor3 = c.Accent or accent, Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, 156) }, 2.5)
-		label(lock, { Text = def.Description or "", ZIndex = 6, TextWrapped = true, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -16, 0, 30), Position = UDim2.fromOffset(8, 182) }, 1.5)
+		new("UIStroke", { Thickness = 3, Color = UIKit.Theme.Ink, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, lock)
+		label(lock, { Text = "Rebirth Required:", ZIndex = 6, Size = UIKit.Theme.Layout.BoardsController.Size15, Position = UDim2.fromOffset(6, 12) }, 2)
+		label(lock, { Text = tostring(def.RequiredRebirths), TextColor3 = RED, ZIndex = 6, Size = UIKit.Theme.Layout.BoardsController.Size16, Position = UDim2.fromOffset(6, 36) }, 3)
+		label(lock, { Text = "🔒", ZIndex = 6, Size = UIKit.Theme.Layout.BoardsController.Size17, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 72) }, 0)
+		label(lock, { Text = "Unlocks:", ZIndex = 6, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size18, Position = UDim2.fromOffset(6, 136) }, 2)
+		label(lock, { Text = def.Icon .. " " .. def.Name, ZIndex = 6, TextColor3 = c.Accent or accent, Size = UIKit.Theme.Layout.BoardsController.Size19, Position = UDim2.fromOffset(6, 156) }, 2.5)
+		label(lock, { Text = def.Description or "", ZIndex = 6, TextWrapped = true, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size20, Position = UDim2.fromOffset(8, 182) }, 1.5)
 		c.Lock = lock
 	end
 	cardsById[def.Id] = cardsById[def.Id] or {}
@@ -379,7 +376,7 @@ local function refreshCard(c)
 	end
 	c.Maxed.Visible = false
 	local canBuy = balance >= cost
-	c.Stroke.Color = if canBuy then c.Accent else Color3.fromRGB(16, 17, 22)
+	c.Stroke.Color = if canBuy then c.Accent else UIKit.Theme.Ink
 	c.BadgeStroke.Color = c.Accent
 	c.BarFill.BackgroundColor3 = c.Accent
 	c.Value.Text = colored(cur, GREY_TEXT) .. " > " .. colored(def.Format(getValue(def.Id, lvl + 1)), c.Accent)
@@ -439,7 +436,7 @@ local function prestigeFx(gained: number)
 	EffectsController.PlaySound("Upgrade", 0.9)
 	EffectsController.CameraPunch(5)
 	local big = label(fxGui, { Text = "⭐ PRESTIGE!", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.3), Size = UDim2.fromScale(0.4, 0.09) }, 5)
-	new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 240, 140), Color3.fromRGB(255, 180, 40)) }, big)
+	new("UIGradient", { Color = ColorSequence.new(UIKit.Theme.Colors.Primary.Light, UIKit.Theme.Colors.Primary.Base) }, big)
 	local sub = label(fxGui, { Text = "+" .. NumberFormat.Format(gained) .. " ⭐ Prestiges", TextColor3 = GOLD, AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.38), Size = UDim2.fromScale(0.3, 0.05) }, 3)
 	for _, l in ipairs({ big, sub }) do
 		local sc = new("UIScale", { Scale = 0.4 }, l)
@@ -468,16 +465,16 @@ local function cardShell(parent, x: number, width: number, strokeColor: Color3)
 	new("UIScale", { Name = "PopScale" }, f)
 	local bg = new("Frame", { Name = "Bg", Size = UDim2.fromScale(1, 1), BackgroundColor3 = WHITE, ZIndex = 0 }, f)
 	new("UICorner", { CornerRadius = UDim.new(0, 16) }, bg)
-	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(64, 68, 84), Color3.fromRGB(40, 43, 54)) }, bg)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(UIKit.Theme.Colors.Rice.Dark, UIKit.Theme.Colors.Rice.Dark) }, bg)
 	stroke(bg, 3, true).Color = strokeColor
 	return f
 end
 
 local function badgeIcon(parent, y: number, icon: string, color: Color3)
-	local badge = new("Frame", { Name = "Badge", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, y), Size = UDim2.fromOffset(62, 62), BackgroundColor3 = Color3.fromRGB(28, 30, 38) }, parent)
+	local badge = new("Frame", { Name = "Badge", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, y), Size = UIKit.Theme.Layout.BoardsController.Size21, BackgroundColor3 = UIKit.Theme.Muted }, parent)
 	new("UICorner", { CornerRadius = UDim.new(1, 0) }, badge)
 	new("UIStroke", { Thickness = 2.5, Color = color, Transparency = 0.35, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, badge)
-	label(badge, { Text = icon, Size = UDim2.new(1, -10, 1, -10), Position = UDim2.fromOffset(5, 5) }, 0)
+	label(badge, { Text = icon, Size = UIKit.Theme.Layout.BoardsController.Size22, Position = UDim2.fromOffset(5, 5) }, 0)
 	return badge
 end
 
@@ -522,28 +519,28 @@ end
 -- locked "coming soon" cards at the end of a scrolling wall
 local function addTeasers(strip, teasers)
 	for _, t in ipairs(teasers) do
-		local tf = cardShell(strip.Strip, strip.X(strip.Count() + 1), CARD_W, Color3.fromRGB(16, 17, 22))
-		label(tf, { Text = t.Title, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, 10) })
-		label(tf, { Text = t.Icon, Size = UDim2.fromOffset(70, 70), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 48) }, 0)
-		label(tf, { Text = t.Text, TextWrapped = true, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -20, 0, 44), Position = UDim2.fromOffset(10, 132) }, 2)
-		label(tf, { Text = "Coming soon", TextColor3 = GOLD, Size = UDim2.new(1, -20, 0, 22), Position = UDim2.fromOffset(10, 184) }, 2)
+		local tf = cardShell(strip.Strip, strip.X(strip.Count() + 1), CARD_W, UIKit.Theme.Colors.Rice.Dark)
+		label(tf, { Text = t.Title, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size23, Position = UDim2.fromOffset(6, 10) })
+		label(tf, { Text = t.Icon, Size = UIKit.Theme.Layout.BoardsController.Size24, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 48) }, 0)
+		label(tf, { Text = t.Text, TextWrapped = true, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size25, Position = UDim2.fromOffset(10, 132) }, 2)
+		label(tf, { Text = "Coming soon", TextColor3 = GOLD, Size = UIKit.Theme.Layout.BoardsController.Size26, Position = UDim2.fromOffset(10, 184) }, 2)
 		strip.Add(tf)
 	end
 end
 
 -- 🤖 The Automation wall: one card per automation (Buy with Prestiges, then an On/Off
 -- switch). A card stays locked until its area is unlocked.
-local AUTO = Color3.fromRGB(150, 210, 255)
+local AUTO = UIKit.Theme.Currency.Fish.Base
 local function makeAutoCard(strip, def)
 	local i = strip.Count() + 1
-	local f = cardShell(strip.Strip, strip.X(i), CARD_W, Color3.fromRGB(16, 17, 22))
+	local f = cardShell(strip.Strip, strip.X(i), CARD_W, UIKit.Theme.Colors.Rice.Dark)
 	local c = { Frame = f, Def = def, Stroke = f.Bg:FindFirstChildOfClass("UIStroke") }
-	label(f, { Text = def.Name, TextColor3 = AUTO, Size = UDim2.new(1, -12, 0, 22), Position = UDim2.fromOffset(6, 6) })
-	c.Count = label(f, { TextColor3 = GREY_TEXT, Size = UDim2.new(1, -12, 0, 16), Position = UDim2.fromOffset(6, 30) }, 2)
+	label(f, { Text = def.Name, TextColor3 = AUTO, Size = UIKit.Theme.Layout.BoardsController.Size27, Position = UDim2.fromOffset(6, 6) })
+	c.Count = label(f, { TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size28, Position = UDim2.fromOffset(6, 30) }, 2)
 	badgeIcon(f, 50, def.Icon, AUTO)
-	label(f, { Text = "Auto", Size = UDim2.new(1, -12, 0, 20), Position = UDim2.fromOffset(6, 116) }, 2.5)
-	label(f, { Text = def.Description, TextWrapped = true, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -14, 0, 30), Position = UDim2.fromOffset(7, 137) }, 1.5)
-	c.Price = label(f, { Size = UDim2.new(1, -14, 0, 16), Position = UDim2.fromOffset(7, 169) }, 2)
+	label(f, { Text = "Auto", Size = UIKit.Theme.Layout.BoardsController.Size29, Position = UDim2.fromOffset(6, 116) }, 2.5)
+	label(f, { Text = def.Description, TextWrapped = true, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size30, Position = UDim2.fromOffset(7, 137) }, 1.5)
+	c.Price = label(f, { Size = UIKit.Theme.Layout.BoardsController.Size31, Position = UDim2.fromOffset(7, 169) }, 2)
 	c.Btn = button(f, { Position = UDim2.fromOffset(12, 188), Size = UDim2.fromOffset(CARD_W - 24, 28) }, function()
 		local owned = player:GetAttribute(AutomationConfig.OwnedAttr(def.Id)) == true
 		if not AutomationConfig.IsUnlocked(def.Id, player:GetAttribute("TotalRebirths")) then
@@ -566,13 +563,13 @@ local function makeAutoCard(strip, def)
 	end)
 	-- locked until the area is unlocked
 	local zone = ZoneConfig.ById[def.Zone]
-	local lock = new("Frame", { Name = "Lock", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(26, 28, 36), BackgroundTransparency = 0.04, ZIndex = 5, Visible = false }, f)
+	local lock = new("Frame", { Name = "Lock", Size = UDim2.fromScale(1, 1), BackgroundColor3 = UIKit.Theme.Muted, BackgroundTransparency = 0.04, ZIndex = 5, Visible = false }, f)
 	new("UICorner", { CornerRadius = UDim.new(0, 16) }, lock)
-	label(lock, { Text = def.Name, ZIndex = 6, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -12, 0, 22), Position = UDim2.fromOffset(6, 10) }, 2)
-	label(lock, { Text = "🔒", ZIndex = 6, Size = UDim2.fromOffset(56, 56), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 40) }, 0)
-	label(lock, { Text = "Unlock the", ZIndex = 6, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -12, 0, 18), Position = UDim2.fromOffset(6, 104) }, 2)
-	label(lock, { Text = zone and (zone.Icon .. " " .. zone.Name) or def.Zone, ZIndex = 6, TextColor3 = AUTO, Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, 124) }, 2.5)
-	label(lock, { Text = "Rebirth Required: " .. AutomationConfig.RequiredRebirths(def.Id), ZIndex = 6, TextColor3 = RED, Size = UDim2.new(1, -12, 0, 20), Position = UDim2.fromOffset(6, 160) }, 2)
+	label(lock, { Text = def.Name, ZIndex = 6, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size32, Position = UDim2.fromOffset(6, 10) }, 2)
+	label(lock, { Text = "🔒", ZIndex = 6, Size = UIKit.Theme.Layout.BoardsController.Size33, AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 40) }, 0)
+	label(lock, { Text = "Unlock the", ZIndex = 6, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size34, Position = UDim2.fromOffset(6, 104) }, 2)
+	label(lock, { Text = zone and (zone.Icon .. " " .. zone.Name) or def.Zone, ZIndex = 6, TextColor3 = AUTO, Size = UIKit.Theme.Layout.BoardsController.Size35, Position = UDim2.fromOffset(6, 124) }, 2.5)
+	label(lock, { Text = "Rebirth Required: " .. AutomationConfig.RequiredRebirths(def.Id), ZIndex = 6, TextColor3 = RED, Size = UIKit.Theme.Layout.BoardsController.Size36, Position = UDim2.fromOffset(6, 160) }, 2)
 	c.Lock = lock
 	strip.Add(f)
 	return c
@@ -592,7 +589,7 @@ local function refreshAutoCard(c)
 		setButton(c.Btn, on and SEQ.Green or SEQ.Red, on and "On" or "Off", unlocked)
 	else
 		local can = prestiges() >= def.Cost
-		c.Stroke.Color = can and AUTO or Color3.fromRGB(16, 17, 22)
+		c.Stroke.Color = can and AUTO or UIKit.Theme.Ink
 		c.Price.Text = "Cost: " .. colored(NumberFormat.Format(def.Cost) .. " ⭐", can and CASH or RED)
 		setButton(c.Btn, can and SEQ.Green or SEQ.Red, "Buy", unlocked)
 	end
@@ -627,33 +624,15 @@ local function buildPrestigeWall(root: GuiObject, part: BasePart)
 
 	-- the exchange card
 	local ex = cardShell(p, GAP, EXCHANGE_W, GOLD)
-	label(ex, { Text = "Prestige", TextColor3 = GOLD, Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, 6) })
+	label(ex, { Text = "Prestige", TextColor3 = GOLD, Size = UIKit.Theme.Layout.BoardsController.Size37, Position = UDim2.fromOffset(6, 6) })
 	label(ex, { Text = "Resets " .. colored("Cash", CASH) .. ", " .. colored("KG", KG) .. " & " .. colored("Cash Upgrades", CASH),
-		TextWrapped = true, TextColor3 = GREY_TEXT, Size = UDim2.new(1, -16, 0, 30), Position = UDim2.fromOffset(8, 32) }, 1.5)
+		TextWrapped = true, TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size38, Position = UDim2.fromOffset(8, 32) }, 1.5)
 	badgeIcon(ex, 66, "⭐", GOLD)
-	local gain = label(ex, { TextColor3 = GOLD, Size = UDim2.new(1, -12, 0, 26), Position = UDim2.fromOffset(6, 132) }, 3)
-	local hint = label(ex, { TextColor3 = GREY_TEXT, Size = UDim2.new(1, -16, 0, 17), Position = UDim2.fromOffset(8, 160) }, 2)
+	local gain = label(ex, { TextColor3 = GOLD, Size = UIKit.Theme.Layout.BoardsController.Size39, Position = UDim2.fromOffset(6, 132) }, 3)
+	local hint = label(ex, { TextColor3 = GREY_TEXT, Size = UIKit.Theme.Layout.BoardsController.Size40, Position = UDim2.fromOffset(8, 160) }, 2)
 	local btn
 	btn = button(ex, { Position = UDim2.fromOffset(10, 180), Size = UDim2.fromOffset(EXCHANGE_W - 20, 34) }, function()
-		local mult = player:GetAttribute("PrestigeMultiplier") or 1
-		if prestiging or PrestigeConfig.Gain(money(), mult) <= 0 then
-			shake(ex)
-			return
-		end
-		if os.clock() < prestigeConfirmUntil then
-			prestigeConfirmUntil = 0
-			prestiging = true
-			task.spawn(function()
-				local gained = Remotes:WaitForChild("RequestPrestige"):InvokeServer()
-				prestiging = false
-				if gained and gained > 0 then prestigeFx(gained) else shake(ex) end
-				BoardsController.RefreshAll()
-			end)
-		else
-			prestigeConfirmUntil = os.clock() + 5
-			task.delay(5.05, BoardsController.RefreshAll)
-		end
-		BoardsController.RefreshAll()
+		require(script.Parent.ResetMenuController).Open("Prestige")
 	end)
 
 	-- the scrolling strip of upgrade cards (+ teasers at the end)
@@ -709,7 +688,7 @@ local function rebirthFx(total: number)
 	for i, text in ipairs(lines) do
 		local l = label(fxGui, { Text = text, TextColor3 = i == 1 and WHITE or (i == 2 and CASH or GOLD), AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.28 + (i - 1) * 0.065), Size = UDim2.fromScale(i == 1 and 0.5 or 0.36, i == 1 and 0.09 or 0.05) }, i == 1 and 5 or 3)
-		if i == 1 then new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 120, 150), Color3.fromRGB(255, 225, 110)) }, l) end
+		if i == 1 then new("UIGradient", { Color = ColorSequence.new(UIKit.Theme.Colors.Primary.Base, UIKit.Theme.Colors.Accent.Base) }, l) end
 		local sc = new("UIScale", { Scale = 0.4 }, l)
 		TweenService:Create(sc, TweenInfo.new(0.4 + i * 0.08, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 		table.insert(made, l)
@@ -744,35 +723,17 @@ local function buildRebirthBoard(root: GuiObject)
 	local boost = centered(116, 36, {}, 3)
 	local unlocks = centered(156, 26, { TextColor3 = GOLD }, 2.5)
 	-- ⭐ progress toward the price
-	local track = new("Frame", { Position = UDim2.fromOffset(30, 196), Size = UDim2.new(1, -60, 0, 26), BackgroundColor3 = Color3.fromRGB(22, 24, 30) }, p)
+	local track = new("Frame", { Position = UDim2.fromOffset(30, 196), Size = UIKit.Theme.Layout.BoardsController.Size41, BackgroundColor3 = UIKit.Theme.Muted }, p)
 	new("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
 	new("UIStroke", { Thickness = 2, Color = RED, Transparency = 0.4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, track)
 	local fill = new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, track)
 	new("UICorner", { CornerRadius = UDim.new(1, 0) }, fill)
-	new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 70, 70), Color3.fromRGB(255, 205, 70)) }, fill)
-	local progress = label(track, { Size = UDim2.new(1, -8, 1, -4), Position = UDim2.fromOffset(4, 2), ZIndex = 3 }, 2.5)
+	new("UIGradient", { Color = ColorSequence.new(UIKit.Theme.Colors.Danger.Base, UIKit.Theme.Colors.Primary.Base) }, fill)
+	local progress = label(track, { Size = UIKit.Theme.Layout.BoardsController.Size42, Position = UDim2.fromOffset(4, 2), ZIndex = 3 }, 2.5)
 	centered(232, 20, { Text = "Resets Cash, Prestiges, Fish & Slices", TextColor3 = GREY_TEXT }, 2)
 	local btn
-	btn = button(p, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 272), Size = UDim2.fromOffset(250, 60) }, function()
-		local total = player:GetAttribute("TotalRebirths") or 0
-		if rebirthing or prestiges() < RebirthConfig.Cost(total) then
-			shake(p)
-			return
-		end
-		if os.clock() < rebirthConfirmUntil then
-			rebirthConfirmUntil = 0
-			rebirthing = true
-			task.spawn(function()
-				local newTotal = Remotes:WaitForChild("RequestRebirth"):InvokeServer()
-				rebirthing = false
-				if newTotal then rebirthFx(newTotal) else shake(p) end
-				BoardsController.RefreshAll()
-			end)
-		else
-			rebirthConfirmUntil = os.clock() + 5
-			task.delay(5.05, BoardsController.RefreshAll)
-		end
-		BoardsController.RefreshAll()
+	btn = button(p, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 272), Size = UIKit.Theme.Layout.BoardsController.Size43 }, function()
+		require(script.Parent.ResetMenuController).Open("Rebirth")
 	end)
 	table.insert(views, {
 		Refresh = function()
@@ -814,11 +775,11 @@ local function buildConverter(root: GuiObject, part: BasePart)
 		return label(p, props, s)
 	end
 	centered(46, 26, { Text = "Sell your " .. colored("Sushi", KG) .. " for " .. colored("Cash", CASH) }, 2)
-	new("Frame", { Position = UDim2.fromOffset(60, 80), Size = UDim2.new(1, -120, 0, 3), BackgroundColor3 = WHITE, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, p)
+	new("Frame", { Position = UDim2.fromOffset(60, 80), Size = UIKit.Theme.Layout.BoardsController.Size44, BackgroundColor3 = WHITE, BackgroundTransparency = 0.8, BorderSizePixel = 0 }, p)
 	centered(90, 30, { Text = "Sushi Value", TextColor3 = GOLD }, 3)
 	local rate = centered(122, 26, {}, 2)
 	local preview = centered(154, 44, { TextColor3 = CASH }, 3)
-	local btn = button(p, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 210), Size = UDim2.fromOffset(240, 62) }, function(b)
+	local btn = button(p, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 210), Size = UIKit.Theme.Layout.BoardsController.Size45 }, function(b)
 		if (player:GetAttribute("KG") or 0) <= 0 then
 			shake(b)
 			return
@@ -946,6 +907,8 @@ end
 
 local function setHover(b: TextButton?)
 	if b == hovered then return end
+	if hovered then UIKit.SetInteraction(hovered,"Normal") end
+	if b then UIKit.SetInteraction(b,"Hover") end
 	if hovered then
 		local sc = hovered:FindFirstChild("PopScale")
 		if sc then TweenService:Create(sc, TweenInfo.new(0.1), { Scale = 1 }):Play() end
