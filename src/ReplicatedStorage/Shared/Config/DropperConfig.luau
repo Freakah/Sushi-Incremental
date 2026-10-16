@@ -6,7 +6,7 @@
 --   (BeltPath P1..Pn, DropperSlots Slot1.., UpgraderSlots Slot1..), so the layout can be
 --   rearranged in Studio. Layout() reads them (same result on server and client).
 --   The 🐱 Neko Upgrades board is NekoLayout.NekoUpgradesBoard itself: a part tagged UpgradeBoard
---   (BoardType DropperUpgradesBoard, BobHeight) that BoardsController draws wherever it stands.
+--   (BoardType DropperUpgradesBoard) that BoardsController draws wherever it stands.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -150,6 +150,14 @@ function DropperConfig.Layout()
 		end
 		return bestD
 	end
+	-- a pad's floor point, pushed out sideways until the whole pad is beside the belt, not on it
+	local function clearOfBelt(pos: Vector3): Vector3
+		local bp = L.At(nearest(pos))
+		local away = flat(pos - bp)
+		local need = DropperConfig.BeltHalfWidth + DropperConfig.PadRadius + 0.3 + DropperConfig.PadGap / 2
+		if away.Magnitude >= need or away.Magnitude < 1e-3 then return pos end
+		return Vector3.new(bp.X, pos.Y, bp.Z) + away.Unit * need
+	end
 	local centre = Vector3.zero
 	for _, p in ipairs(points) do centre += p / #points end
 	-- floor point beside the belt at distance d, on the inside of the U, `out` studs from the centre
@@ -179,7 +187,7 @@ function DropperConfig.Layout()
 		local land = L.At(d)
 		local shift = flat(land - spout)
 		local pad = f.Position + shift - f.RightVector * (math.max(m.Size.X, boxSize.Z) / 2 + DropperConfig.PadGap + DropperConfig.PadRadius)
-		L.Droppers[i] = { Pivot = pivot + shift, Spout = spout + shift, Land = land, D = d, Pad = pad }
+		L.Droppers[i] = { Pivot = pivot + shift, Spout = spout + shift, Land = land, D = d, Pad = clearOfBelt(pad) }
 		table.insert(L.Markers, m)
 	end
 
@@ -191,7 +199,7 @@ function DropperConfig.Layout()
 		local d = nearest(m.Position)
 		local p, dir = L.At(d)
 		local out = DropperConfig.BeltHalfWidth + 1.4 + DropperConfig.PadGap + DropperConfig.PadRadius
-		L.Gates[i] = { CFrame = CFrame.lookAt(p, p + dir), D = d, Pad = inside(d, out), Mult = u.Mult, Cost = u.Cost }
+		L.Gates[i] = { CFrame = CFrame.lookAt(p, p + dir), D = d, Pad = clearOfBelt(inside(d, out)), Mult = u.Mult, Cost = u.Cost }
 		table.insert(L.Markers, m)
 	end
 
