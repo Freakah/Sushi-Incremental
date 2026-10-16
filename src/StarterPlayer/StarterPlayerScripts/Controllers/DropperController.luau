@@ -4,7 +4,8 @@
 --   when each dropper drops (DropperDrop, with the neko's value) and pays the Neko itself; this
 --   only shows the ride: hop out of the spout onto the belt, ride upright around the U, flash
 --   each owned gate it passes, and vanish into the Neko head with "+X 🐱".
---   Walking onto a pad asks the server to buy (RequestBuyDropper / RequestBuyUpgrader).
+--   Each buy pad is a clone of Assets.Dropper.UpgradePad; stepping on its button asks the server
+--   to buy (RequestBuyDropper / RequestBuyUpgrader).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -30,9 +31,10 @@ local L = nil -- DropperConfig.Layout()
 local folder: Folder
 local dropperAsset: Model
 local nekoAsset: Model
+local padAsset: Model
 local droppers: { [number]: Model } = {}
 local gates: { [number]: Model } = {}
-local pads = {} -- { Model, Pos, Kind = "Dropper" | "Gate", Index, Cost }
+local pads = {} -- { Model, Kind = "Dropper" | "Gate", Index, Cost, Last, Rest = { [button part] = CFrame }, BodyColor }
 local items = {} -- { Root, Offset, Slot, Speed, Value, T0, LastD }
 local pool = {}
 
@@ -75,6 +77,7 @@ local function label(parent: Instance, text: string, height: number)
 	lbl.Size = UDim2.fromScale(1, 1)
 	lbl.Font = Enum.Font.FredokaOne
 	lbl.TextScaled = true
+	lbl.RichText = true
 	lbl.TextColor3 = Color3.new(1, 1, 1)
 	lbl.Text = text
 	lbl.Parent = bb
@@ -122,18 +125,88 @@ end
 
 -- ===== droppers, gates and pads =====
 
-local function makePad(pos: Vector3, text: string, kind: string, index: number, cost: number): Model
-	local m = Instance.new("Model")
+-- a model standing on the floor at `cf` (its lowest point at cf's height)
+local function ground(m: Model, cf: CFrame)
+	m:PivotTo(cf)
+	local box, size = m:GetBoundingBox()
+	m:PivotTo(cf + Vector3.new(0, cf.Y - (box.Y - size.Y / 2), 0))
+end
+
+-- the button sinks and springs back
+local function press(pad)
+	for part, cf in pairs(pad.Rest) do
+		part.CFrame = cf - Vector3.new(0, 0.3, 0)
+		TweenService:Create(part, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { CFrame = cf }):Play()
+	end
+end
+
+local function denied(pad)
+	local body = pad.Model:FindFirstChild("button_body") :: BasePart?
+	if body then
+		body.Color = RED:Lerp(body.Color, 0.15)
+		TweenService:Create(body, TweenInfo.new(0.5), { Color = pad.BodyColor }):Play()
+	end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root then
+		EffectsController.FloatingText(root.Position + Vector3.new(0, 3, 0), "Need " .. NumberFormat.Format(pad.Cost) .. " 🐱", Color3.fromRGB(255, 120, 130))
+	end
+	EffectsController.PlaySound("UIClick", 0.5)
+end
+
+local function standingOn(pad): boolean
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root or not pad.Model.Parent then return false end
+	local off = pad.Model:GetPivot():PointToObjectSpace(root.Position)
+	return math.abs(off.X) <= DropperConfig.PadRadius + 0.5 and math.abs(off.Z) <= DropperConfig.PadRadius + 0.5 and off.Y < 6
+end
+
+local function stepOn(pad, hit: BasePart)
+	local char = player.Character
+	if not char or not hit:IsDescendantOf(char) or os.clock() - pad.Last < 0.8 then return end
+	pad.Last = os.clock()
+	if player:GetAttribute("Zone") ~= DropperConfig.Zone then return end
+	if (player:GetAttribute("Neko") or 0) < pad.Cost then
+		denied(pad)
+		return
+	end
+	press(pad)
+	EffectsController.PlaySound("UIClick", 1)
+	if pad.Kind == "Dropper" then
+		Remotes.RequestBuyDropper:FireServer()
+	else
+		Remotes.RequestBuyUpgrader:FireServer(pad.Index)
+	end
+	-- the server can see us a little behind; if the pad is still here, ask again while we stand on it
+	task.delay(1, function()
+		if standingOn(pad) then stepOn(pad, char:FindFirstChild("HumanoidRootPart") :: BasePart) end
+	end)
+end
+
+-- a clone of Assets.Dropper.UpgradePad on the floor at `pos`; stepping on its button buys
+local function makePad(pos: Vector3, name: string, kind: string, index: number, cost: number): Model
+	local m = padAsset:Clone()
 	m.Name = kind .. "Pad" .. index
-	local disc = part(m, "Pad", Vector3.new(0.3, DropperConfig.PadRadius * 2, DropperConfig.PadRadius * 2),
-		CFrame.new(pos + Vector3.new(0, 0.15, 0)) * CFrame.Angles(0, 0, math.pi / 2), NEKO, false)
-	disc.Shape = Enum.PartType.Cylinder
-	disc.Material = Enum.Material.Neon
-	disc.Transparency = 0.25
-	disc.CanCollide = false
-	label(disc, text, 4)
+	local pad = { Model = m, Kind = kind, Index = index, Cost = cost, Last = 0, Rest = {} }
+	for _, d in ipairs(m:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanTouch = d.Name == "button_body" or d.Name == "top_panel"
+		end
+	end
+	ground(m, CFrame.new(pos))
+	for _, n in ipairs({ "button_body", "top_panel" }) do
+		local p = m:FindFirstChild(n) :: BasePart?
+		if p then
+			pad.Rest[p] = p.CFrame
+			p.Touched:Connect(function(hit) stepOn(pad, hit) end)
+		end
+	end
+	local body = m:FindFirstChild("button_body") :: BasePart?
+	pad.BodyColor = body and body.Color
+	local price = if cost == 0 then "FREE" else "🐱 " .. NumberFormat.Format(cost)
+	label(m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart"), name .. '\n<font color="#' .. NEKO:ToHex() .. '">' .. price .. "</font>", 4.5)
 	m.Parent = folder
-	table.insert(pads, { Model = m, Pos = pos, Kind = kind, Index = index, Cost = cost })
+	table.insert(pads, pad)
 	return m
 end
 
@@ -176,8 +249,7 @@ local function refresh()
 	local next_ = L.Droppers[owned + 1]
 	local cost = DropperConfig.DropperCosts[owned + 1]
 	if next_ and cost then
-		local text = if cost == 0 then "First Dropper —\nFREE" else "New Dropper!\n🐱 " .. NumberFormat.Format(cost) .. " Neko"
-		makePad(next_.Pad, text, "Dropper", owned + 1, cost)
+		makePad(next_.Pad, if cost == 0 then "First Dropper —" else "New Dropper!", "Dropper", owned + 1, cost)
 	end
 	-- gates: owned ones exist, the rest are only a pad
 	for i, g in ipairs(L.Gates) do
@@ -189,7 +261,7 @@ local function refresh()
 			gates[i] = nil
 		end
 		if not has then
-			makePad(g.Pad, "Upgrader x" .. NumberFormat.Format(g.Mult) .. "\n🐱 " .. NumberFormat.Format(g.Cost) .. " Neko", "Gate", i, g.Cost)
+			makePad(g.Pad, "Upgrader x" .. NumberFormat.Format(g.Mult), "Gate", i, g.Cost)
 		end
 	end
 end
@@ -264,37 +336,6 @@ local function clearItems()
 	table.clear(items)
 end
 
--- ===== buying on a pad =====
-
-local inside: { [Model]: boolean } = {}
-local lastTry = 0
-local function checkPads()
-	if player:GetAttribute("Zone") ~= DropperConfig.Zone then
-		table.clear(inside)
-		return
-	end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not root then return end
-	for _, p in ipairs(pads) do
-		local off = root.Position - p.Pos
-		local now = Vector3.new(off.X, 0, off.Z).Magnitude <= DropperConfig.PadRadius and math.abs(off.Y) < 6
-		if now and os.clock() - lastTry > 0.6 then
-			if (player:GetAttribute("Neko") or 0) >= p.Cost then
-				lastTry = os.clock()
-				if p.Kind == "Dropper" then
-					Remotes.RequestBuyDropper:FireServer()
-				else
-					Remotes.RequestBuyUpgrader:FireServer(p.Index)
-				end
-			elseif not inside[p.Model] then
-				EffectsController.FloatingText(root.Position + Vector3.new(0, 3, 0), "Need " .. NumberFormat.Format(p.Cost) .. " 🐱", Color3.fromRGB(255, 120, 130))
-				EffectsController.PlaySound("UIClick", 0.6)
-			end
-		end
-		inside[p.Model] = now
-	end
-end
-
 function DropperController.Init()
 	folder = Instance.new("Folder")
 	folder.Name = "MyDroppers"
@@ -304,6 +345,7 @@ function DropperController.Init()
 		local assets = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("Dropper")
 		dropperAsset = assets:WaitForChild("SushiDropper") :: Model
 		nekoAsset = assets:WaitForChild("ManekiNeko") :: Model
+		padAsset = assets:WaitForChild("UpgradePad") :: Model
 		L = DropperConfig.Layout()
 		refresh()
 		player:GetAttributeChangedSignal("NekoSlots"):Connect(refresh)
@@ -313,6 +355,8 @@ function DropperController.Init()
 		Remotes:WaitForChild("DropperBought").OnClientEvent:Connect(function(slot: number)
 			refresh()
 			celebrate(droppers[slot], L.Droppers[slot].Spout, "🐱 NEW DROPPER!")
+			local nextPad = folder:FindFirstChild("DropperPad" .. slot + 1)
+			if nextPad then popIn(nextPad :: Model) end
 		end)
 		Remotes:WaitForChild("UpgraderBought").OnClientEvent:Connect(function(i: number)
 			refresh()
@@ -325,7 +369,6 @@ function DropperController.Init()
 		if player:GetAttribute("Zone") ~= DropperConfig.Zone then clearItems() end
 	end)
 	RunService.RenderStepped:Connect(step)
-	RunService.Heartbeat:Connect(checkPads)
 end
 
 return DropperController
