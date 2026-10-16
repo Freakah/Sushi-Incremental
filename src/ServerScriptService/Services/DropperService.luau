@@ -12,6 +12,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local PhysicsService = game:GetService("PhysicsService")
 
 local DropperConfig = require(ReplicatedStorage.Shared.Config.DropperConfig)
 local PlayerDataService = require(script.Parent.PlayerDataService)
@@ -222,6 +223,13 @@ local function canBuy(player: Player, padPos: Vector3, cooldown: number): boolea
 end
 
 function DropperService.Start()
+	-- falling neko (client-side physics) pass through droppers and each other
+	for _, g in ipairs({ DropperConfig.NekoGroup, DropperConfig.DropperGroup }) do
+		if not PhysicsService:IsCollisionGroupRegistered(g) then PhysicsService:RegisterCollisionGroup(g) end
+	end
+	PhysicsService:CollisionGroupSetCollidable(DropperConfig.NekoGroup, DropperConfig.DropperGroup, false)
+	PhysicsService:CollisionGroupSetCollidable(DropperConfig.NekoGroup, DropperConfig.NekoGroup, false)
+
 	local drop = remote("DropperDrop")          -- server -> owner: (slot, beltSpeed, value)
 	local bought = remote("DropperBought")      -- server -> owner: (slot)
 	local gateBought = remote("UpgraderBought") -- server -> owner: (gate)

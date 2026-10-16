@@ -2,7 +2,8 @@
 --   Draws only this player's droppers, gates and buy pads, and the maneki-neko riding the belt.
 --   Everything is placed from DropperConfig.Layout() (the NekoLayout markers). The server decides
 --   when each dropper drops (DropperDrop, with the neko's value) and pays the Neko itself; this
---   only shows the ride: hop out of the spout onto the belt, ride upright around the U, flash
+--   only shows the ride: fall from the nozzle onto the belt (real physics, at rest under the nozzle,
+--   passing through the dropper by collision group), ride upright around the U, flash
 --   each owned gate it passes, and vanish into the Neko head with "+X 🐱".
 --   Each buy pad is a clone of Assets.Dropper.UpgradePad; stepping on its button asks the server
 --   to buy (RequestBuyDropper / RequestBuyUpgrader).
@@ -10,6 +11,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DropperConfig = require(ReplicatedStorage.Shared.Config.DropperConfig)
@@ -25,7 +27,6 @@ local NEKO = Color3.fromRGB(255, 175, 210)
 local CREAM = Color3.fromRGB(255, 243, 225)
 local RED = Color3.fromRGB(205, 70, 70)
 local GATE = Color3.fromRGB(150, 210, 255)
-local HOP = 1.2 -- studs a neko hops up while falling from the spout to the belt
 
 local L = nil -- DropperConfig.Layout()
 local folder: Folder
@@ -87,17 +88,21 @@ local function label(parent: Instance, text: string, height: number)
 	st.Parent = lbl
 end
 
+-- grows the model from nothing to its current scale
 local function popIn(m: Model)
+	local full = m:GetScale()
 	local v = Instance.new("NumberValue")
 	v.Value = 0.1
-	m:ScaleTo(0.1)
-	v.Changed:Connect(function(s) m:ScaleTo(math.max(s, 0.05)) end)
+	m:ScaleTo(full * 0.1)
+	v.Changed:Connect(function(s) m:ScaleTo(full * math.max(s, 0.05)) end)
 	local tw = TweenService:Create(v, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Value = 1 })
 	tw:Play()
 	tw.Completed:Once(function() v:Destroy() end)
 end
 
--- ===== the neko item: the ManekiNeko model, welded to its cushion so one CFrame moves it =====
+-- ===== the neko item: the ManekiNeko model welded to its cushion, which is the only collider =====
+
+local NEKO_PHYSICS = PhysicalProperties.new(0.7, 0.8, 0, 1, 100) -- density, friction, no bounce
 
 local function newItem()
 	local m = nekoAsset:Clone()
@@ -107,6 +112,7 @@ local function newItem()
 		if d:IsA("BasePart") then
 			d.Anchored = d == root
 			d.CanCollide, d.CanQuery, d.CanTouch, d.CastShadow, d.Massless = false, false, false, false, true
+			d.CollisionGroup = DropperConfig.NekoGroup
 			if d ~= root then
 				local w = Instance.new("WeldConstraint")
 				w.Part0, w.Part1 = root, d
@@ -114,11 +120,15 @@ local function newItem()
 			end
 		end
 	end
+	root.CanCollide, root.CanQuery, root.Massless = true, true, false
+	root.CustomPhysicalProperties = NEKO_PHYSICS
 	m.Name = "NekoItem"
-	return { Model = m, Root = root, Offset = m:GetPivot():ToObjectSpace(root.CFrame) }
+	local _, size = m:GetBoundingBox()
+	return { Model = m, Root = root, Offset = m:GetPivot():ToObjectSpace(root.CFrame), Height = size.Y }
 end
 
 local function release(it)
+	it.Root.Anchored = true
 	it.Model.Parent = nil
 	table.insert(pool, it)
 end
@@ -239,7 +249,11 @@ local function refresh()
 		if i <= owned and not droppers[i] then
 			droppers[i] = anchoredClone(dropperAsset)
 			droppers[i].Name = "Dropper" .. i
+			droppers[i]:ScaleTo(DropperConfig.DropperScale)
 			droppers[i]:PivotTo(spot.Pivot)
+			for _, d in ipairs(droppers[i]:GetDescendants()) do
+				if d:IsA("BasePart") then d.CollisionGroup = DropperConfig.DropperGroup end
+			end
 			droppers[i].Parent = folder
 		elseif i > owned and droppers[i] then
 			droppers[i]:Destroy()
@@ -276,11 +290,19 @@ end
 
 -- ===== neko on the belt =====
 
+-- a neko appears just under the dropper's nozzle, at rest, and falls onto the belt under gravity
 local function spawnItem(slot: number, speed: number, value: number)
 	if not L or not droppers[slot] then return end
+	local spot = L.Droppers[slot]
 	local it = table.remove(pool) or newItem()
-	it.Slot, it.Speed, it.Value, it.T0, it.LastD = slot, speed, value, os.clock(), L.Droppers[slot].D
-	it.Model.Parent = folder
+	it.Slot, it.Speed, it.Value, it.T0, it.LastD, it.Falling = slot, speed, value, os.clock(), spot.D, true
+	local _, dir = L.At(spot.D)
+	local pos = spot.Spout - Vector3.new(0, it.Height + 0.1, 0) -- the model's pivot is at its bottom
+	it.Model.Parent = folder -- parent first: moving the root outside workspace would re-set the welds
+	it.Root.CFrame = CFrame.lookAt(pos, pos + dir) * it.Offset
+	it.Root.Anchored = false
+	it.Root.AssemblyLinearVelocity = Vector3.zero
+	it.Root.AssemblyAngularVelocity = Vector3.zero
 	table.insert(items, it)
 end
 
@@ -304,30 +326,33 @@ local function step()
 	for i = #items, 1, -1 do
 		local it = items[i]
 		local spot = L.Droppers[it.Slot]
-		local t = now - it.T0
-		local cf
-		if t < DropperConfig.FallTime then
-			-- hop from the spout onto the belt, upright, already facing along the belt
-			local u = t / DropperConfig.FallTime
-			local pos = spot.Spout:Lerp(spot.Land, u) + Vector3.new(0, HOP * 4 * u * (1 - u), 0)
-			local _, dir = L.At(spot.D)
-			cf = CFrame.lookAt(pos, pos + dir)
-		else
-			local d = spot.D + (t - DropperConfig.FallTime) * it.Speed
-			for gi, g in ipairs(L.Gates) do
-				if it.LastD < g.D and d >= g.D and player:GetAttribute(DropperConfig.GateAttribute(gi)) then flash(gi) end
-			end
-			it.LastD = d
-			if d >= L.Length then
-				sold(it)
-				release(it)
+		if it.Falling then
+			-- physics until it rests on the belt; then it rides the belt's path from there
+			local bottom = (it.Root.CFrame * it.Offset:Inverse()).Y
+			local t = now - it.T0
+			if bottom <= spot.Land.Y + 0.3 or (t > 0.15 and math.abs(it.Root.AssemblyLinearVelocity.Y) < 0.5) then
+				it.Falling = false
+				it.Root.Anchored = true
+				it.T0 = now
+			elseif t > 3 or bottom < spot.Land.Y - 20 then
+				release(it) -- stuck or fell off: tidy it away
 				table.remove(items, i)
-				continue
 			end
-			local p, dir = L.At(d)
-			cf = CFrame.lookAt(p, p + dir)
+			continue
 		end
-		it.Root.CFrame = cf * it.Offset
+		local d = spot.D + (now - it.T0) * it.Speed
+		for gi, g in ipairs(L.Gates) do
+			if it.LastD < g.D and d >= g.D and player:GetAttribute(DropperConfig.GateAttribute(gi)) then flash(gi) end
+		end
+		it.LastD = d
+		if d >= L.Length then
+			sold(it)
+			release(it)
+			table.remove(items, i)
+			continue
+		end
+		local p, dir = L.At(d)
+		it.Root.CFrame = CFrame.lookAt(p, p + dir) * it.Offset
 	end
 end
 
@@ -347,6 +372,7 @@ function DropperController.Init()
 		nekoAsset = assets:WaitForChild("ManekiNeko") :: Model
 		padAsset = assets:WaitForChild("UpgradePad") :: Model
 		L = DropperConfig.Layout()
+		while not PhysicsService:IsCollisionGroupRegistered(DropperConfig.NekoGroup) do task.wait(0.25) end
 		refresh()
 		player:GetAttributeChangedSignal("NekoSlots"):Connect(refresh)
 		for i in ipairs(L.Gates) do

@@ -22,8 +22,11 @@ DropperConfig.TileLength = 4       -- straight conveyor pieces are stretched to 
 DropperConfig.CornerRadius = 8     -- belt centreline radius at each BeltPath corner
 DropperConfig.CornerStep = math.rad(5) -- one conveyor slice per this much turn
 DropperConfig.BaseSpeed = 16       -- studs per second before Conveyor Speed
-DropperConfig.FallTime = 0.45      -- seconds from the dropper's spout to the belt
+DropperConfig.FallTime = 0.2       -- seconds a neko takes to fall from the nozzle onto the belt
 DropperConfig.ItemScale = 0.6      -- the ManekiNeko model is scaled to this to ride the belt
+DropperConfig.DropperScale = 1.4   -- the SushiDropper model is scaled up so its nozzle reaches over the belt
+DropperConfig.NekoGroup = "NekoItem"       -- collision groups: falling neko pass through droppers
+DropperConfig.DropperGroup = "NekoDropper" -- and each other (DropperService registers them)
 
 -- ===== droppers (bought in order; one per DropperSlots marker, up to #DropperCosts) =====
 DropperConfig.DropInterval = 2     -- seconds between drops, per dropper
@@ -155,11 +158,14 @@ function DropperConfig.Layout()
 		return p + side * out - up * DropperConfig.BeltHeight
 	end
 
-	-- droppers: the model's spout side (-X) faces the marker's front (-Z), standing on the floor
+	-- droppers (scaled by DropperScale): the model's spout side (-X) faces the marker's front (-Z),
+	-- standing on the floor, then slid so the nozzle is right above the belt's centreline
+	local s = DropperConfig.DropperScale
 	local spoutPart = dropper:FindFirstChild("DropPoint", true) :: BasePart
-	local spoutRel = dropper:GetPivot():PointToObjectSpace(spoutPart.Position)
+	local spoutRel = dropper:GetPivot():PointToObjectSpace(spoutPart.Position) * s
 	local boxCf, boxSize = dropper:GetBoundingBox()
-	local boxRel = dropper:GetPivot():PointToObjectSpace(boxCf.Position)
+	local boxRel = dropper:GetPivot():PointToObjectSpace(boxCf.Position) * s
+	boxSize *= s
 	L.Droppers = {}
 	for i, m in ipairs(numbered(root:WaitForChild("DropperSlots"), "Slot")) do
 		if i > #DropperConfig.DropperCosts then break end
@@ -168,8 +174,10 @@ function DropperConfig.Layout()
 			* CFrame.new(-boxRel.X, boxSize.Y / 2 - boxRel.Y, -boxRel.Z)
 		local spout = (pivot * CFrame.new(spoutRel)).Position
 		local d = nearest(spout)
-		local pad = f.Position - f.RightVector * (m.Size.X / 2 + DropperConfig.PadGap + DropperConfig.PadRadius)
-		L.Droppers[i] = { Pivot = pivot, Spout = spout, Land = (L.At(d)), D = d, Pad = pad }
+		local land = L.At(d)
+		local shift = flat(land - spout)
+		local pad = f.Position + shift - f.RightVector * (math.max(m.Size.X, boxSize.Z) / 2 + DropperConfig.PadGap + DropperConfig.PadRadius)
+		L.Droppers[i] = { Pivot = pivot + shift, Spout = spout + shift, Land = land, D = d, Pad = pad }
 		table.insert(L.Markers, m)
 	end
 
