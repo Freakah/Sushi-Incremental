@@ -45,7 +45,7 @@ Server-authoritative. The client only renders and sends requests; the server val
 - **Gameplay services** (`Services/`): `SushiService` (per-player sushi spawning + validated collection),
   `EconomyService` (KG → Cash at sell stalls), `UpgradeService`, `PrestigeService`, `RebirthService`,
   `AscensionService` (Blood Altar), `SkillTreeService`, `ZoneService` (portal travel), `FishingService`
-  (Sushi Pond), `SlashService` (Sushi Slashing), `RuneService` (Rune Altars), `AutomationService`,
+  (Sushi Pond), `SlashService` (Sushi Slashing), `DropperService` (Sushi Restaurant droppers, upgrader gates + 🐱 Neko; builds the U conveyor, Neko head and board at runtime from the marker parts in `workspace.Map.NekoLayout` — read by `DropperConfig.Layout()` — and the meshes in `ReplicatedStorage.Assets.Dropper`), `RuneService` (Rune Altars), `AutomationService`,
   `ProfileShopService` (titles, nametags, Robux passes/products), `LeaderboardService` (Hall of Fame boards),
   `AdminService` (admin panel, UserId allow-list).
 - **Networking:** remotes live in the place's `ReplicatedStorage.Remotes` folder. Services get-or-create them

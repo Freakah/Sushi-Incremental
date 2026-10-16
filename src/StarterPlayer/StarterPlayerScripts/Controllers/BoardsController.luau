@@ -3,6 +3,7 @@
 --   🤖 Automation wall (scrolls sideways)
 --   🎣 Sushi Pond: 🐟 Fish Upgrades
 --   🗡️ Sushi Slashing: 🍥 Slice Upgrades
+--   🏮 Sushi Restaurant: 🐱 Neko Upgrades
 -- Board parts are tagged "UpgradeBoard" with a BoardType attribute, so any zone
 -- can have its own wall. Everything is drawn on SurfaceGuis and clicked with our
 -- own raycast (Roblox's SurfaceGui input is unreliable on transparent parts).
@@ -23,6 +24,7 @@ local EconomyConfig = require(Shared.Config.EconomyConfig)
 local AscensionConfig = require(Shared.Config.AscensionConfig)
 local FishConfig = require(Shared.Config.FishConfig)
 local SliceConfig = require(Shared.Config.SliceConfig)
+local DropperConfig = require(Shared.Config.DropperConfig)
 local PrestigeConfig = require(Shared.Config.PrestigeConfig)
 local AutomationConfig = require(Shared.Config.AutomationConfig)
 local ZoneConfig = require(Shared.Config.ZoneConfig)
@@ -49,6 +51,7 @@ local KG = Color3.fromRGB(255, 180, 80)
 local ASC = Color3.fromRGB(255, 95, 95)
 local FISH = Color3.fromRGB(110, 200, 255)
 local SLICE = Color3.fromRGB(255, 140, 170)
+local NEKO = Color3.fromRGB(255, 175, 210)
 
 local SEQ = {
 	Green = ColorSequence.new(Color3.fromRGB(125, 245, 100), Color3.fromRGB(50, 180, 60)),
@@ -72,6 +75,7 @@ local CANVAS = {
 	Converter = Vector2.new(3 * CARD_W + 4 * GAP, PILL_H + PANEL_H), -- same size as the upgrade boards
 	FishUpgradesBoard = Vector2.new(4 * CARD_W + 5 * GAP, PILL_H + PANEL_H), -- More Fish, Faster Fish, Fish Luck, Auto Fish
 	SliceUpgradesBoard = Vector2.new(4 * CARD_W + 5 * GAP, PILL_H + PANEL_H), -- More Slices, Faster Slashes, Critical Slices, Auto Slash
+	DropperUpgradesBoard = Vector2.new(3 * CARD_W + 4 * GAP, PILL_H + PANEL_H), -- Neko Value, Conveyor Speed, Neko Multiplier
 	AscensionBoard = Vector2.new(300, PILL_H + PANEL_H),
 	AscensionUpgradesBoard = Vector2.new(4 * CARD_W + 5 * GAP, PILL_H + PANEL_H),
 }
@@ -216,6 +220,8 @@ local function fishLevel(id) return player:GetAttribute(FishConfig.Upgrades.Attr
 local function slices(): number return player:GetAttribute("Slices") or 0 end
 local function sliceLevel(id) return player:GetAttribute(SliceConfig.Upgrades.AttributeName(id)) or 1 end
 local function prestLevel(id) return player:GetAttribute(PrestigeConfig.AttributeName(id)) or 1 end
+local function neko(): number return player:GetAttribute("Neko") or 0 end
+local function nekoLevel(id) return player:GetAttribute(DropperConfig.Upgrades.AttributeName(id)) or 1 end
 
 -- every upgrade board shares the same cards
 local KINDS = {
@@ -227,6 +233,8 @@ local KINDS = {
 		Currency = colored("Fish", FISH), Accent = FISH, Title = "Fish Upgrades", PillIcon = "🐟", PillColor = FISH, Flash = FISH },
 	Slice = { Config = SliceConfig.Upgrades, List = SliceConfig.Upgrades.List, Level = sliceLevel, Balance = slices, Remote = "RequestSliceUpgrade",
 		Currency = colored("Slices", SLICE), Accent = SLICE, Title = "Slice Upgrades", PillIcon = "🍥", PillColor = SLICE, Flash = SLICE },
+	Neko = { Config = DropperConfig.Upgrades, List = DropperConfig.Upgrades.List, Level = nekoLevel, Balance = neko, Remote = "RequestNekoUpgrade",
+		Currency = colored("Neko", NEKO), Accent = NEKO, Title = "Neko Upgrades", PillIcon = "🐱", PillColor = NEKO, Flash = NEKO },
 	Prestige = { Config = PrestigeConfig, List = PrestigeConfig.List, Level = prestLevel, Balance = prestiges, Remote = "RequestPrestigeUpgrade",
 		Currency = colored("Prestiges", GOLD), Accent = GOLD, Title = "Prestige Upgrades", PillIcon = "⭐", PillColor = GOLD, Flash = GOLD },
 }
@@ -882,6 +890,8 @@ local function buildBoardFor(part: BasePart)
 		buildUpgradeBoard(canvas, "Fish")
 	elseif boardType == "SliceUpgradesBoard" then
 		buildUpgradeBoard(canvas, "Slice")
+	elseif boardType == "DropperUpgradesBoard" then
+		buildUpgradeBoard(canvas, "Neko")
 	end
 	worldGuis[part] = sg
 end
@@ -998,7 +1008,8 @@ function BoardsController.Init()
 
 	local watched = { "Money", "KG", "SellRate", "TotalRebirths", "RebirthCost",
 		"Ascensions", "AscensionPoints", "Set_AutoBuy", "T_" .. AscensionConfig.RequiredNode,
-		"Fish", "Slices", "Prestiges", "TotalPrestiges", "PrestigeCount", "PrestigeMultiplier" }
+		"Fish", "Slices", "Neko", "Prestiges", "TotalPrestiges", "PrestigeCount", "PrestigeMultiplier" }
+	for _, u in ipairs(DropperConfig.Upgrades.List) do table.insert(watched, DropperConfig.Upgrades.AttributeName(u.Id)) end
 	for _, u in ipairs(FishConfig.Upgrades.List) do table.insert(watched, FishConfig.Upgrades.AttributeName(u.Id)) end
 	for _, u in ipairs(SliceConfig.Upgrades.List) do table.insert(watched, SliceConfig.Upgrades.AttributeName(u.Id)) end
 	for _, u in ipairs(PrestigeConfig.List) do table.insert(watched, PrestigeConfig.AttributeName(u.Id)) end
@@ -1040,6 +1051,9 @@ function BoardsController.Init()
 		end)
 		Remotes:WaitForChild("PrestigeUpgradePurchased").OnClientEvent:Connect(function(id, newLevel, bought)
 			onPurchased("Prestige", id, newLevel, bought)
+		end)
+		Remotes:WaitForChild("NekoUpgradePurchased").OnClientEvent:Connect(function(id, newLevel, bought)
+			onPurchased("Neko", id, newLevel, bought)
 		end)
 	end)
 end
