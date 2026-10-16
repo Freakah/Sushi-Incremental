@@ -36,16 +36,12 @@ local pads = {} -- { Model, Pos, Kind = "Dropper" | "Gate", Index, Cost }
 local items = {} -- { Root, Offset, Slot, Speed, Value, T0, LastD }
 local pool = {}
 
-local function anchoredClone(src: Model, ghost: boolean): Model
+local function anchoredClone(src: Model): Model
 	local m = src:Clone()
 	for _, d in ipairs(m:GetDescendants()) do
 		if d:IsA("BasePart") then
 			d.Anchored = true
 			if d.Name == "DropPoint" then d.Transparency = 1 end
-			if ghost then
-				d.Transparency = math.max(d.Transparency, 0.7)
-				d.CanCollide = false
-			end
 		end
 	end
 	return m
@@ -142,10 +138,11 @@ local function makePad(pos: Vector3, text: string, kind: string, index: number, 
 end
 
 -- a neko-eared arch over the belt with a glowing panel the neko pass through
-local function makeGate(i: number, ghost: boolean): Model
+local function makeGate(i: number): Model
+	local ghost = false
 	local g = L.Gates[i]
 	local m = Instance.new("Model")
-	m.Name = (if ghost then "GhostGate" else "Gate") .. i
+	m.Name = "Gate" .. i
 	local floor = -DropperConfig.BeltHeight -- the gate's CFrame is at the belt top
 	local x = DropperConfig.BeltHalfWidth + 0.6
 	for _, s in ipairs({ -1, 1 }) do
@@ -163,11 +160,11 @@ local function refresh()
 	if not L then return end
 	for _, p in ipairs(pads) do p.Model:Destroy() end
 	table.clear(pads)
-	-- droppers: owned ones, plus a ghost and a pad for the next
+	-- droppers: only the owned ones exist; the next one is just its pad until bought
 	local owned = math.clamp(player:GetAttribute("NekoSlots") or 0, 0, #L.Droppers)
 	for i, spot in ipairs(L.Droppers) do
 		if i <= owned and not droppers[i] then
-			droppers[i] = anchoredClone(dropperAsset, false)
+			droppers[i] = anchoredClone(dropperAsset)
 			droppers[i].Name = "Dropper" .. i
 			droppers[i]:PivotTo(spot.Pivot)
 			droppers[i].Parent = folder
@@ -180,19 +177,17 @@ local function refresh()
 	local cost = DropperConfig.DropperCosts[owned + 1]
 	if next_ and cost then
 		local text = if cost == 0 then "First Dropper —\nFREE" else "New Dropper!\n🐱 " .. NumberFormat.Format(cost) .. " Neko"
-		local pad = makePad(next_.Pad, text, "Dropper", owned + 1, cost)
-		local ghost = anchoredClone(dropperAsset, true)
-		ghost:PivotTo(next_.Pivot)
-		ghost.Parent = pad -- a see-through preview of what you're buying
+		makePad(next_.Pad, text, "Dropper", owned + 1, cost)
 	end
-	-- gates: owned ones solid, the rest ghosted with a pad each
+	-- gates: owned ones exist, the rest are only a pad
 	for i, g in ipairs(L.Gates) do
 		local has = player:GetAttribute(DropperConfig.GateAttribute(i)) == true
-		if gates[i] and (gates[i].Name == "Gate" .. i) ~= has then
+		if has and not gates[i] then
+			gates[i] = makeGate(i)
+		elseif not has and gates[i] then
 			gates[i]:Destroy()
 			gates[i] = nil
 		end
-		gates[i] = gates[i] or makeGate(i, not has)
 		if not has then
 			makePad(g.Pad, "Upgrader x" .. NumberFormat.Format(g.Mult) .. "\n🐱 " .. NumberFormat.Format(g.Cost) .. " Neko", "Gate", i, g.Cost)
 		end
