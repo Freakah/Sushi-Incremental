@@ -43,16 +43,16 @@ end
 
 -- { icon, word, color, value() }
 local STATS = {
-	{ "💵", "Cash", C(90, 255, 110), function() return NumberFormat.Format(attr("TotalMoney")) end },
+	{ UIKit.Icons.Cash, "Cash", C(90, 255, 110), function() return NumberFormat.Format(attr("TotalMoney")) end },
 	{ "⏱️", "Playtime", C(80, 215, 255), function() return playtime(attr("Playtime")) end },
-	{ "🐟", "Fish", C(110, 200, 255), function() return NumberFormat.Format(attr("TotalFish")) end },
-	{ "🔄", "Rebirths", C(255, 80, 95), function() return NumberFormat.Format(attr("TotalRebirths")) end },
-	{ "⭐", "Prestiges", C(255, 215, 70), function() return NumberFormat.Format(attr("TotalPrestiges")) end },
-	{ "🍣", "Sushi", C(255, 225, 70), function() return NumberFormat.Format(attr("SushiCollected")) end },
-	{ "⚖️", "Weight", C(255, 180, 80), function() return NumberFormat.KG(attr("TotalKG")) end },
-	{ "📖", "Index", C(95, 185, 255), function() return attr("IndexCount") .. "/" .. sushiTypes end },
+	{ UIKit.Icons.Fish, "Fish", C(110, 200, 255), function() return NumberFormat.Format(attr("TotalFish")) end },
+	{ UIKit.Icons.Rebirth, "Rebirths", C(255, 80, 95), function() return NumberFormat.Format(attr("TotalRebirths")) end },
+	{ UIKit.Icons.Prestige, "Prestiges", C(255, 215, 70), function() return NumberFormat.Format(attr("TotalPrestiges")) end },
+	{ UIKit.Icons.Sushi, "Sushi", C(255, 225, 70), function() return NumberFormat.Format(attr("SushiCollected")) end },
+	{ UIKit.Icons.KG, "Weight", C(255, 180, 80), function() return NumberFormat.KG(attr("TotalKG")) end },
+	{ UIKit.Icons.Index, "Index", C(95, 185, 255), function() return attr("IndexCount") .. "/" .. sushiTypes end },
 	{ "🌸", "Upgrades", C(255, 140, 200), function() return attr("TreeCount") .. "/" .. SkillTreeConfig.Count end },
-	{ "🏷️", "Titles", C(255, 210, 60), function() return unlockedTitles() .. "/" .. #TitleConfig.List end },
+	{ UIKit.Icons.Titles, "Titles", C(255, 210, 60), function() return unlockedTitles() .. "/" .. #TitleConfig.List end },
 	{ "💎", "Robux", C(90, 255, 110), function() return NumberFormat.Format(attr("RobuxSpent")) end },
 }
 
@@ -66,7 +66,7 @@ end
 function ProfileController.Toggle() window.Toggle() end
 
 function ProfileController.Init()
-	window = UIKit.Window({ Name = "Profile", Title = "Profile", Icon = "👤", Accent = CYAN, Size = Vector2.new(860, 560) })
+	window = UIKit.Window({ Name = "Profile", Title = "Profile", Icon = UIKit.Icons.Profile, Accent = CYAN, Size = Vector2.new(860, 560) })
 	local body = window.Body
 	body:FindFirstChildOfClass("UIStroke").Color = CYAN
 
@@ -94,7 +94,7 @@ function ProfileController.Init()
 		local row = UIKit.new("Frame", { Name = s[2], LayoutOrder = i, Size = UDim2.new(1, -6, 0, 62), BackgroundColor3 = UIKit.Colors.Row }, list)
 		UIKit.Corner(row, 14)
 		UIKit.Stroke(row, 3, CYAN, true)
-		UIKit.Label(row, { Text = s[1], Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, 9) }, 0)
+		UIKit.Icon(row, s[1], { Size = UDim2.fromOffset(44, 44), Position = UDim2.fromOffset(12, 9) })
 		UIKit.Label(row, { Text = 'Total <font color="#' .. s[3]:ToHex() .. '">' .. s[2] .. "</font>", TextXAlignment = Enum.TextXAlignment.Left,
 			Size = UDim2.new(0.6, -64, 0, 38), Position = UDim2.fromOffset(64, 12) }, 3)
 		local value = UIKit.Label(row, { Text = "", TextXAlignment = Enum.TextXAlignment.Right, AnchorPoint = Vector2.new(1, 0),

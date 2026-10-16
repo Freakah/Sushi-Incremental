@@ -65,12 +65,15 @@ local function buy(c)
 	end
 end
 
+-- ui-pack icons for the items that have one (the rest keep their emoji)
+local ICONS = { DoubleCash = UIKit.Icons.Cash, DoubleSushi = UIKit.Icons.Sushi, CashBoost = UIKit.Icons.Potion, LuckBoost = UIKit.Icons.Potion }
+
 local function card(parent, item, isPass: boolean, order: number)
 	local f = UIKit.new("Frame", { Name = item.Key, LayoutOrder = order, BackgroundColor3 = C(255, 255, 255) }, parent)
 	UIKit.Corner(f, 18)
 	UIKit.Stroke(f, 3.5, isPass and GREEN or C(120, 200, 255), true)
 	UIKit.new("UIGradient", { Rotation = 90, Color = ColorSequence.new(C(118, 118, 126), C(82, 82, 90)) }, f)
-	UIKit.Label(f, { Name = "Icon", Text = item.Icon, Size = UDim2.fromOffset(84, 84), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 12) }, 0)
+	UIKit.Icon(f, ICONS[item.Key] or item.Icon, { Name = "Icon", Size = UDim2.fromOffset(84, 84), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 12) })
 	UIKit.Label(f, { Name = "ItemName", Text = item.Name, Size = UDim2.new(1, -16, 0, 32), Position = UDim2.fromOffset(8, 100),
 		TextColor3 = isPass and C(150, 255, 140) or C(150, 215, 255) }, 3)
 	UIKit.Label(f, { Name = "Desc", Text = item.Desc, TextColor3 = UIKit.Colors.Subtle, TextWrapped = true,
@@ -108,7 +111,7 @@ end
 function ShopController.Toggle() window.Toggle() end
 
 function ShopController.Init()
-	window = UIKit.Window({ Name = "Shop", Title = "Shop", Icon = "🛒", Accent = GREEN, Size = Vector2.new(900, 660) })
+	window = UIKit.Window({ Name = "Shop", Title = "Shop", Icon = UIKit.Icons.Shop, Accent = GREEN, Size = Vector2.new(900, 660) })
 	local list = UIKit.List(window.Body, 6)
 	local passes = section(list, "⭐ Game Passes", 1, C(150, 255, 140))
 	for i, p in ipairs(ShopConfig.Passes) do card(passes, p, true, i) end

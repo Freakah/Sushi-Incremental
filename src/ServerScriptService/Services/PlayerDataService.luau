@@ -21,6 +21,7 @@ local SliceConfig = require(ReplicatedStorage.Shared.Config.SliceConfig)
 local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
 local AutomationConfig = require(ReplicatedStorage.Shared.Config.AutomationConfig)
 local RuneConfig = require(ReplicatedStorage.Shared.Config.RuneConfig)
+local DropperConfig = require(ReplicatedStorage.Shared.Config.DropperConfig)
 local NumberFormat = require(ReplicatedStorage.Shared.Util.NumberFormat)
 
 local DATA_VERSION = 1
@@ -93,6 +94,12 @@ local function defaultData()
 		-- 🔮 Runes (see RuneConfig): kept forever (also through Rebirth)
 		Runes = {},           -- [runeId] = copies rolled
 		RuneRolls = 0,        -- lifetime rolls
+		-- 🐱 Sushi Restaurant droppers (see DropperConfig): kept forever (never reset)
+		Neko = 0,             -- spendable
+		TotalNeko = 0,        -- lifetime Neko earned
+		NekoSlots = 0,        -- droppers owned (bought in order; the first is free)
+		NekoGates = {},       -- [tostring(i)] = true for each upgrader gate owned
+		NekoUpgrades = {},    -- [id] = level
 		-- LastPosition = { X, Y, Z, Zone } when "Save Last Position" is on
 	}
 end
@@ -279,6 +286,16 @@ local function syncReplicated(player: Player, data)
 	player:SetAttribute("TotalSlices", data.TotalSlices)
 	for _, u in ipairs(SliceConfig.Upgrades.List) do
 		player:SetAttribute(SliceConfig.Upgrades.AttributeName(u.Id), data.SliceUpgrades[u.Id] or 1)
+	end
+	-- 🐱 Sushi Restaurant
+	player:SetAttribute("Neko", data.Neko)
+	player:SetAttribute("TotalNeko", data.TotalNeko)
+	player:SetAttribute("NekoSlots", data.NekoSlots)
+	for i in ipairs(DropperConfig.Upgraders) do
+		player:SetAttribute(DropperConfig.GateAttribute(i), data.NekoGates[tostring(i)] == true)
+	end
+	for _, u in ipairs(DropperConfig.Upgrades.List) do
+		player:SetAttribute(DropperConfig.Upgrades.AttributeName(u.Id), data.NekoUpgrades[u.Id] or 1)
 	end
 	player:SetAttribute("HeaviestSushi", data.HeaviestSushi)
 	player:SetAttribute("Playtime", math.floor(data.Playtime))
@@ -665,6 +682,73 @@ function PlayerDataService.CheapestFishUpgrade(player: Player): string?
 	return best
 end
 
+-- ===== 🐱 Sushi Restaurant droppers =====
+
+function PlayerDataService.GetDropperStats(player: Player)
+	local data = profiles[player]
+	if not data then return nil end
+	local gates = {}
+	for k in pairs(data.NekoGates) do gates[tonumber(k)] = true end
+	return DropperConfig.GetStats(data.NekoUpgrades, data.NekoSlots, gates)
+end
+
+-- Neko from neko reaching the Neko head; only the Neko attributes are touched
+function PlayerDataService.AddNeko(player: Player, amount: number)
+	local data = profiles[player]
+	if not data or amount <= 0 then return end
+	data.Neko += amount
+	data.TotalNeko += amount
+	player:SetAttribute("Neko", data.Neko)
+	player:SetAttribute("TotalNeko", data.TotalNeko)
+end
+
+-- buys the next dropper with Neko (the first is free). Returns the new dropper count, or nil.
+function PlayerDataService.BuyDropperSlot(player: Player): number?
+	local data = profiles[player]
+	if not data then return nil end
+	local cost = DropperConfig.DropperCosts[data.NekoSlots + 1]
+	if not cost or data.Neko < cost then return nil end
+	data.Neko -= cost
+	data.NekoSlots += 1
+	player:SetAttribute("Neko", data.Neko)
+	player:SetAttribute("NekoSlots", data.NekoSlots)
+	return data.NekoSlots
+end
+
+-- buys upgrader gate `i` with Neko. Returns true if bought.
+function PlayerDataService.BuyUpgrader(player: Player, i: number): boolean
+	local data = profiles[player]
+	local u = DropperConfig.Upgraders[i]
+	if not data or not u or data.NekoGates[tostring(i)] or data.Neko < u.Cost then return false end
+	data.Neko -= u.Cost
+	data.NekoGates[tostring(i)] = true
+	player:SetAttribute("Neko", data.Neko)
+	player:SetAttribute(DropperConfig.GateAttribute(i), true)
+	return true
+end
+
+-- 🐱 Neko Upgrades (paid in Neko). One level, or as many as affordable. Returns levels bought.
+function PlayerDataService.BuyNekoUpgrade(player: Player, id: string, buyMax: boolean): number
+	local data = profiles[player]
+	local shop = DropperConfig.Upgrades
+	local u = shop.ById[id]
+	if not data or not u then return 0 end
+	local bought = 0
+	for _ = 1, (buyMax and u.Levels or 1) do
+		local level = data.NekoUpgrades[id] or 1
+		local cost = shop.GetCost(id, level)
+		if not cost or data.Neko < cost then break end
+		data.Neko -= cost
+		data.NekoUpgrades[id] = level + 1
+		bought += 1
+	end
+	if bought > 0 then
+		player:SetAttribute("Neko", data.Neko)
+		player:SetAttribute(shop.AttributeName(id), data.NekoUpgrades[id])
+	end
+	return bought
+end
+
 -- ===== ⭐ Prestige =====
 
 -- Exchanges ALL your Cash for Prestiges (see PrestigeConfig.Gain). Resets Cash, KG and
@@ -884,6 +968,7 @@ function PlayerDataService.AdminGive(player: Player, key: string, amount: number
 	elseif key == "Prestiges" then add("Prestiges", "TotalPrestiges")
 	elseif key == "Fish" then add("Fish", "TotalFish")
 	elseif key == "Slices" then add("Slices", "TotalSlices")
+	elseif key == "Neko" then add("Neko", "TotalNeko")
 	elseif key == "AP" then add("AscensionPoints")
 	elseif key == "Rebirths" then data.TotalRebirths = math.max(0, math.floor(amount))
 	else return false end
@@ -913,7 +998,7 @@ function PlayerDataService.Start()
 		end
 		grant.Parent = tools
 
-		-- Studio-only chat commands for testing: /cash 300000  /kg 50  /rebirths 2  /prestiges 10
+		-- Studio-only chat commands for testing: /cash 300000  /kg 50  /rebirths 2  /prestiges 10  /neko 500
 		local function onChat(player: Player, message: string)
 			local data = profiles[player]
 			if not data then return end
@@ -928,6 +1013,9 @@ function PlayerDataService.Start()
 				data.TotalRebirths = math.max(0, math.floor(n))
 			elseif cmd == "prestiges" then
 				data.Prestiges += math.floor(n)
+			elseif cmd == "neko" then
+				data.Neko += n
+				data.TotalNeko += n
 			elseif cmd == "treeall" then
 				for _, node in ipairs(SkillTreeConfig.List) do data.Tree[node.Id] = node.Max end
 				treeCache[data] = nil
@@ -970,7 +1058,7 @@ function PlayerDataService.Start()
 			local folder = Instance.new("Folder")
 			folder.Name = "DevCommands"
 			folder.Parent = TextChatService
-			for _, alias in ipairs({ "/cash", "/kg", "/rebirths", "/prestiges", "/treeall", "/treereset", "/ascendready", "/ap", "/indexall" }) do
+			for _, alias in ipairs({ "/cash", "/kg", "/rebirths", "/prestiges", "/neko", "/treeall", "/treereset", "/ascendready", "/ap", "/indexall" }) do
 				local command = Instance.new("TextChatCommand")
 				command.Name = alias
 				command.PrimaryAlias = alias

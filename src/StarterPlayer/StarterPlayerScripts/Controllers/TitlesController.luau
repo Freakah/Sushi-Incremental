@@ -94,7 +94,7 @@ function TitlesController.HasNew(): boolean
 end
 
 function TitlesController.Init()
-	window = UIKit.Window({ Name = "Titles", Title = "Titles", Icon = "🏷️", Accent = GOLD, Size = Vector2.new(820, 640) })
+	window = UIKit.Window({ Name = "Titles", Title = "Titles", Icon = UIKit.Icons.Titles, Accent = GOLD, Size = Vector2.new(820, 640) })
 	local list = UIKit.List(window.Body, 10)
 	for i, t in ipairs(TitleConfig.List) do
 		local row = UIKit.new("Frame", { Name = t.Id, LayoutOrder = i, Size = UDim2.new(1, -10, 0, 86), BackgroundColor3 = UIKit.Colors.Row }, list)

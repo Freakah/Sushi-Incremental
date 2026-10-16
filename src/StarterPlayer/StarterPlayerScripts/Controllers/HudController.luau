@@ -3,6 +3,7 @@
 --   main area: Sushi KG, Cash, Prestiges (once you're close to your first Prestige)
 --   Sushi Pond: Fish, Cash
 --   Sushi Slashing: Slices, Cash
+--   Sushi Restaurant: Neko, Cash
 -- Bars are created from a spec so new currencies are one line to add.
 
 local Players = game:GetService("Players")
@@ -268,10 +269,21 @@ function HudController.Init()
 		Format = NumberFormat.Format,
 	}, 5)
 
+	createBar({
+		Attribute = "Neko",
+		Icon = "🐱",
+		Caption = "Neko",
+		Color = Color3.fromRGB(240, 110, 160),
+		Color2 = Color3.fromRGB(255, 190, 215),
+		TextColor = Color3.new(1, 1, 1),
+		Format = NumberFormat.Format,
+	}, 6)
+
 	-- which bars each area shows (Cash is always there); areas not listed use the main area's
 	local ZONE_BARS = {
 		Fishing = { "Fish", "Money" },
 		Slashing = { "Slices", "Money" },
+		Dropper = { "Neko", "Money" },
 	}
 	-- the Prestiges bar appears once you're halfway to your first Prestige (or have any)
 	local PrestigeConfig = require(ReplicatedStorage.Shared.Config.PrestigeConfig)
