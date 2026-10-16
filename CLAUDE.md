@@ -63,7 +63,7 @@ Server-authoritative. The client only renders and sends requests; the server val
   ambience. `workspace.FishingPortal` is a saved model now (animated via the `AnimatedPortal` tag), so the old
   FishingPortalBuilder/Animator scripts were removed — don't bring them back. `ReplicatedFirst/LocalScript` contains only the single character `w` in the place.
 - CollectionService tags used by code: `UpgradeBoard`, `SellZone`, `Leaderboard`, `AnimatedPortal`,
-  `AnimatedBar`, `SushiBoss`. Map lookups go through `workspace.Map`.
+  `AnimatedBar`, `SushiBoss`, `SwayProp`, `WaveProp`, `SpinProp` (PropAnimationController). Map lookups go through `workspace.Map`.
 
 ## Build tools (`tools/`, not synced)
 
