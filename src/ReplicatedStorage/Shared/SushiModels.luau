@@ -160,8 +160,8 @@ local function addRarityEffects(model: Model, root: BasePart, rarity)
 end
 
 -- ===== imported 3D models =====
--- If ReplicatedStorage.Shared.SushiMeshes has a MeshPart named after the type id
--- (e.g. "TunaNigiri"), it replaces the procedural body. It is scaled to fit the
+-- If ReplicatedStorage.Shared.SushiMeshes has a MeshPart or Model named after the type id
+-- (e.g. "TunaMaki"), it replaces the procedural body. It is scaled to fit the
 -- old footprint, sits on the floor, and faces -Z. Delete a mesh to fall back to
 -- the procedural sushi. Optional attribute on the mesh: FrontYaw (degrees).
 local MESH_WIDTH = { Nigiri = 2.7, Maki = 2.3, Gunkan = 2.3 }
@@ -169,6 +169,24 @@ local meshFolder = Shared:FindFirstChild("SushiMeshes")
 
 local function buildFromMesh(model: Model, def, typeId: string): boolean
 	local template = meshFolder and meshFolder:FindFirstChild(typeId)
+	if template and template:IsA("Model") then
+		-- multi-part import (e.g. a .glb): one Model "Body" holding every piece
+		local body = template:Clone()
+		body.Name = "Body"
+		for _, p in body:GetDescendants() do
+			if p:IsA("BasePart") then
+				p.Anchored, p.CanCollide, p.CanTouch, p.CanQuery, p.Massless = true, false, false, false, true
+			end
+		end
+		local size = body:GetExtentsSize()
+		body:ScaleTo(body:GetScale() * (MESH_WIDTH[def.Shape] or 2.5) / math.max(size.X, size.Z))
+		size = body:GetExtentsSize()
+		local yaw = math.rad(template:GetAttribute("FrontYaw") or 0)
+		local cf, _ = body:GetBoundingBox()
+		body:PivotTo(CFrame.new(0, size.Y / 2, 0) * CFrame.Angles(0, yaw, 0) * cf:Inverse() * body:GetPivot())
+		body.Parent = model
+		return true
+	end
 	if not (template and template:IsA("MeshPart")) then return false end
 	local body = template:Clone()
 	body.Name = "Body"
@@ -237,7 +255,8 @@ function SushiModels.Build(typeId: string, kg: number?)
 
 	local top
 	if buildFromMesh(model, def, typeId) then
-		top = model.Body.Size.Y
+		local body = model.Body
+		top = body:IsA("Model") and body:GetExtentsSize().Y or body.Size.Y
 	else
 		Builders[def.Shape](model, def)
 	end

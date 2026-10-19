@@ -88,7 +88,8 @@ local function spawnOne(player: Player, state: State, zoneId: string, isInitial:
 	local tree = stats.Tree
 	local luck = stats.Luck * zone.LuckMultiplier
 	local rng = state.Rng
-	local rarity = RarityConfig.Roll(rng, luck)
+	local pools = SushiCatalog.ZonePools[zoneId] or SushiCatalog.ZonePools.Starter
+	local rarity = RarityConfig.Roll(rng, luck, pools)
 	-- Skill tree "orders": a chance to guarantee a minimum rarity (best order first)
 	if tree then
 		local minOrder = 0
@@ -99,7 +100,7 @@ local function spawnOne(player: Player, state: State, zoneId: string, isInitial:
 		elseif tree.OrderRare > 0 and rng:NextNumber() < tree.OrderRare then
 			minOrder = 3
 		end
-		if rarity.Order < minOrder then rarity = RarityConfig.RollAtLeast(rng, luck, minOrder) end
+		if rarity.Order < minOrder then rarity = RarityConfig.RollAtLeast(rng, luck, minOrder, pools) end
 	end
 	local typeId = SushiCatalog.RandomType(rng, rarity.Id, zoneId)
 	local value = stats.ValueMultiplier * zone.KGMultiplier

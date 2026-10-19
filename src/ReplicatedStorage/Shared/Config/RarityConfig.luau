@@ -30,8 +30,9 @@ RarityConfig.List = {
 		Ring = true, Light = true, Particles = true, Highlight = true,
 	},
 	{
-		Id = "Legendary", Order = 5, Weight = 0.5, LuckPower = 1.6,
-		MinKG = 7, MaxKG = 15,
+		-- Golden Salmon Maki: ~1 in 13 spawns at Luck 1
+		Id = "Legendary", Order = 5, Weight = 6, LuckPower = 0.6,
+		MinKG = 2, MaxKG = 5,
 		Color = Color3.fromRGB(255, 196, 40), Scale = 1.55,
 		Ring = true, Light = true, Particles = true, Highlight = true,
 	},
@@ -42,8 +43,9 @@ RarityConfig.List = {
 		Ring = true, Light = true, Particles = true, Highlight = true,
 	},
 	{
-		Id = "Secret", Order = 7, Weight = 0.01, LuckPower = 2.4,
-		MinKG = 50, MaxKG = 120,
+		-- Diamond Salmon Maki: ~1 in 50 spawns at Luck 1, ~50x a common's KG
+		Id = "Secret", Order = 7, Weight = 1.5, LuckPower = 0.8,
+		MinKG = 10, MaxKG = 25,
 		Color = Color3.fromRGB(255, 255, 255), Scale = 2.1, Rainbow = true,
 		Ring = true, Light = true, Particles = true, Highlight = true,
 	},
@@ -55,18 +57,19 @@ for _, r in ipairs(RarityConfig.List) do
 end
 
 -- Weighted roll. `rng` is a Random object, `luck` >= 1.
-function RarityConfig.Roll(rng: Random, luck: number)
+-- `pools` (rarity id -> types, e.g. a zone's pool) skips rarities with nothing to spawn.
+function RarityConfig.Roll(rng: Random, luck: number, pools: { [string]: any }?)
 	local total = 0
 	local weights = table.create(#RarityConfig.List)
 	for i, r in ipairs(RarityConfig.List) do
-		local w = r.Weight * (luck ^ r.LuckPower)
+		local w = (pools and not pools[r.Id]) and 0 or r.Weight * (luck ^ r.LuckPower)
 		weights[i] = w
 		total += w
 	end
 	local pick = rng:NextNumber() * total
 	for i, r in ipairs(RarityConfig.List) do
 		pick -= weights[i]
-		if pick <= 0 then
+		if pick <= 0 and weights[i] > 0 then
 			return r
 		end
 	end
@@ -83,19 +86,24 @@ function RarityConfig.RollKG(rng: Random, rarity, valueMultiplier: number, minRo
 end
 
 -- Weighted roll restricted to rarities of at least `minOrder` (Rare/Premium/Master Orders).
-function RarityConfig.RollAtLeast(rng: Random, luck: number, minOrder: number)
-	local total = 0
+-- With `pools`, falls back to a normal roll when no allowed rarity is that high.
+function RarityConfig.RollAtLeast(rng: Random, luck: number, minOrder: number, pools: { [string]: any }?)
+	local total, last = 0, nil
 	for _, r in ipairs(RarityConfig.List) do
-		if r.Order >= minOrder then total += r.Weight * (luck ^ r.LuckPower) end
+		if r.Order >= minOrder and not (pools and not pools[r.Id]) then
+			total += r.Weight * (luck ^ r.LuckPower)
+			last = r
+		end
 	end
+	if not last then return RarityConfig.Roll(rng, luck, pools) end
 	local pick = rng:NextNumber() * total
 	for _, r in ipairs(RarityConfig.List) do
-		if r.Order >= minOrder then
+		if r.Order >= minOrder and not (pools and not pools[r.Id]) then
 			pick -= r.Weight * (luck ^ r.LuckPower)
 			if pick <= 0 then return r end
 		end
 	end
-	return RarityConfig.List[#RarityConfig.List]
+	return last
 end
 
 -- Chance (0-1) of each rarity for a given luck; handy for a future odds UI.
