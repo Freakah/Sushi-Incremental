@@ -194,6 +194,34 @@ function AdminController.Init()
 		b.LayoutOrder = i
 	end
 
+	-- cinematic: hide every other ScreenGui and the Roblox core UI, leaving only the 🛠️ button
+	local StarterGui = game:GetService("StarterGui")
+	local playerGui = gui.Parent :: PlayerGui
+	local hidden: { ScreenGui } = {}
+	local addedConn: RBXScriptConnection?
+	local function hide(g: Instance)
+		if g:IsA("ScreenGui") and g ~= gui and g.Name ~= "Freecam" and g.Enabled then -- Freecam (Shift+P) is for filming
+			g.Enabled = false
+			table.insert(hidden, g)
+		end
+	end
+	local cine
+	cine = button(row(30), "🎬 Cinematic: Off", Color3.fromRGB(90, 90, 120), UDim2.fromScale(1, 1), function()
+		local on = addedConn == nil
+		cine.Text = on and "🎬 Cinematic: On" or "🎬 Cinematic: Off"
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.All, not on)
+		if on then
+			for _, g in ipairs(playerGui:GetChildren()) do hide(g) end
+			addedConn = playerGui.ChildAdded:Connect(hide)
+			panel.Visible = false
+		else
+			(addedConn :: RBXScriptConnection):Disconnect()
+			addedConn = nil
+			for _, g in ipairs(hidden) do g.Enabled = true end
+			table.clear(hidden)
+		end
+	end)
+
 	-- toggle button (bottom-left)
 	local toggle = button(gui, "🛠️", PANEL, UDim2.fromOffset(44, 44), function()
 		panel.Visible = not panel.Visible
