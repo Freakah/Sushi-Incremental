@@ -23,6 +23,7 @@ local order = {
 	"NametagController",
 	"ZoneController",
 	"PropAnimationController",
+	"NpcTalkController",
 	"AmbientController",
 	"TutorialController",
 	"AscensionController",
