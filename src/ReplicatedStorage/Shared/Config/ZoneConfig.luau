@@ -40,11 +40,11 @@ ZoneConfig.List = {
 	},
 	{
 		Id = "Dropper", Name = "Sushi Restaurant", Icon = "🏮", Color = Color3.fromRGB(255, 150, 70),
-		-- the dropper world (placeholder: no gameplay yet), reached through the placeholder portal
-		-- on the right of the Sushi Bar (Map.DropperPortal); the portal at the end of the
-		-- restaurant's entrance path (Map.SushiRestaurant.DropperReturnPortal) leads back.
+		-- the dropper world (DropperService / DropperConfig: droppers, conveyor, 🐱 Neko), reached
+		-- through the portal on the right of the Sushi Bar (Map.DropperPortal); the portal at the end
+		-- of the restaurant's entrance path (Map.SushiRestaurant.DropperReturnPortal) leads back.
 		RequiredRebirths = 3, KGMultiplier = 1, LuckMultiplier = 1,
-		Subtitle = "The dropper world",
+		Subtitle = "Droppers make 🐱 Neko",
 		ArrivalPath = { "Map", "SushiRestaurant", "Arrival" },
 	},
 }

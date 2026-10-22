@@ -135,7 +135,7 @@ function RunesMenuController.HasNew(): boolean return hasNew end
 
 function RunesMenuController.Init()
 	local gridW = COLS * CARD_W + (COLS - 1) * GAP
-	window = UIKit.Window({ Name = "Runes", Title = "Runes", Icon = "🔮", Accent = C(120, 230, 255), Size = Vector2.new(SIDE_W + gridW + 44 + 60 + 24, 720) })
+	window = UIKit.Window({ Name = "Runes", Title = "Runes", Icon = UIKit.Icons.Runes, Accent = C(120, 230, 255), Size = Vector2.new(SIDE_W + gridW + 44 + 60 + 24, 720) })
 	local body = window.Body
 
 	-- area tabs

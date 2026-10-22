@@ -16,6 +16,7 @@ local order = {
 	"AutomationService",
 	"RuneService",
 	"SlashService",
+	"DropperService",
 	"LeaderboardService",
 	"AdminService",
 }

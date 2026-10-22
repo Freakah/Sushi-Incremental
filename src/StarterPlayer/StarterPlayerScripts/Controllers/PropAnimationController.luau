@@ -4,32 +4,63 @@
 --   SpinAxis (Vector3, default Y)   SpinPivot (Vector3 world point, default own centre -> orbit when set)
 --   SwayDeg (degrees): swings back and forth instead of spinning (uses SwayAxis / SwayPivot, e.g. a hanging lantern)
 --   PulseTo (Color3, parts only): the colour gently pulses between its own colour and this one (e.g. neon glow)
+--   SwaySpeed (default 1.3): how fast a SwayDeg prop swings
+-- Or tag it (CollectionService) for the same with defaults; attributes still override:
+--   SwayProp: SwayDeg 5, hanging from the top of its bounding box (lanterns, noren curtains)
+--   WaveProp: SwayDeg 25, SwaySpeed 5, about its pivot's own X axis (a maneki-neko's beckoning paw)
+--   SpinProp: SpinSpeed 30
 
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
 
 local PropAnimationController = {}
 
-type Prop = { Target: Instance, Base: CFrame, Speed: number, Bob: number, Sway: number, Axis: Vector3, Pivot: Vector3, Phase: number }
+type Prop = { Target: Instance, Base: CFrame, Speed: number, Bob: number, Sway: number, SwaySpeed: number, Axis: Vector3, Pivot: Vector3, Phase: number }
 local props: { Prop } = {}
 local pulses: { { Part: BasePart, A: Color3, B: Color3 } } = {}
+
+local TAG_DEFAULTS = {
+	SwayProp = { SwayDeg = 5 },
+	WaveProp = { SwayDeg = 25, SwaySpeed = 5 },
+	SpinProp = { SpinSpeed = 30 },
+}
+
+local function attr(inst: Instance, name: string): any
+	local v = inst:GetAttribute(name)
+	if v ~= nil then return v end
+	for tag, d in pairs(TAG_DEFAULTS) do
+		if d[name] ~= nil and CollectionService:HasTag(inst, tag) then return d[name] end
+	end
+	return nil
+end
 
 local function register(inst: Instance)
 	local pulseTo = inst:GetAttribute("PulseTo")
 	if typeof(pulseTo) == "Color3" and inst:IsA("BasePart") then
 		table.insert(pulses, { Part = inst, A = inst.Color, B = pulseTo })
 	end
-	local speed = inst:GetAttribute("SpinSpeed")
-	local bob = inst:GetAttribute("BobHeight")
-	local sway = inst:GetAttribute("SwayDeg")
+	local speed = attr(inst, "SpinSpeed")
+	local bob = attr(inst, "BobHeight")
+	local sway = attr(inst, "SwayDeg")
 	if not speed and not bob and not sway then return end
-	local base
+	local base, top
 	if inst:IsA("Model") then
 		base = inst:GetPivot()
+		local box, size = inst:GetBoundingBox()
+		top = box.Position + Vector3.new(0, size.Y / 2, 0)
 	elseif inst:IsA("BasePart") then
 		base = inst.CFrame
+		top = base.Position + Vector3.new(0, inst.Size.Y / 2, 0)
 	else
 		return
+	end
+	local axis = inst:GetAttribute(if sway then "SwayAxis" else "SpinAxis")
+	local pivot = inst:GetAttribute(if sway then "SwayPivot" else "SpinPivot")
+	if sway and CollectionService:HasTag(inst, "WaveProp") then
+		axis = axis or base.XVector
+	elseif sway and CollectionService:HasTag(inst, "SwayProp") then
+		pivot = pivot or top
 	end
 	table.insert(props, {
 		Target = inst,
@@ -37,8 +68,9 @@ local function register(inst: Instance)
 		Speed = speed or 0,
 		Bob = bob or 0,
 		Sway = sway or 0,
-		Axis = (inst:GetAttribute(if sway then "SwayAxis" else "SpinAxis") or (if sway then Vector3.xAxis else Vector3.yAxis)).Unit,
-		Pivot = inst:GetAttribute(if sway then "SwayPivot" else "SpinPivot") or base.Position,
+		SwaySpeed = attr(inst, "SwaySpeed") or 1.3,
+		Axis = (axis or (if sway then Vector3.xAxis else Vector3.yAxis)).Unit,
+		Pivot = pivot or base.Position,
 		Phase = math.random() * math.pi * 2,
 	})
 end
@@ -101,7 +133,7 @@ function PropAnimationController.Init()
 		end
 		for _, p in ipairs(props) do
 			if p.Target.Parent then
-				local angle = if p.Sway ~= 0 then p.Sway * math.sin(t * 1.3 + p.Phase) else p.Speed * t
+				local angle = if p.Sway ~= 0 then p.Sway * math.sin(t * p.SwaySpeed + p.Phase) else p.Speed * t
 				local rot = CFrame.fromAxisAngle(p.Axis, math.rad(angle))
 				local pivot = CFrame.new(p.Pivot)
 				local cf = pivot * rot * pivot:Inverse() * p.Base

@@ -41,7 +41,7 @@ GameConfig.Music = {
 GameConfig.MusicVolume = 0.25
 
 -- Rarities at/above this order announce their spawn to the owner
-GameConfig.AnnounceSpawnOrder = 5 -- Legendary
+GameConfig.AnnounceSpawnOrder = 7 -- Secret (Diamond); Golden spawns too often to announce
 -- Rarities at/above this order are announced to the whole server when collected
 GameConfig.GlobalAnnounceOrder = 6 -- Mythic
 

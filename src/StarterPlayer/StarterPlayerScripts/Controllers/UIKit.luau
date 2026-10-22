@@ -1,6 +1,7 @@
--- UIKit: the game's menu style (grey rounded panels, thick dark outlines,
--- icon + title header, "Close" button, outlined rows, big On/Off buttons).
--- Every menu (Settings, Index, and later Titles/Profile/Shop) is built
+-- UIKit: the game's menu style (ui-pack/: rice-paper panels with a nori band,
+-- coloured title tab, red X close button on the top-right corner, nori-ink outlines,
+-- outlined rows, big On/Off buttons).
+-- Every menu (Settings, Index, Titles, Profile, Shop, Runes) is built
 -- from these pieces so they all look and animate the same.
 
 local Players = game:GetService("Players")
@@ -14,20 +15,35 @@ local UIKit = {}
 
 local C = Color3.fromRGB
 UIKit.Colors = {
-	Panel = C(88, 88, 94),
-	Inner = C(64, 64, 70),
-	Row = C(108, 108, 114),
-	Outline = C(32, 32, 36),
-	Title = C(225, 225, 230),
+	Panel = C(255, 247, 234), -- rice
+	Inner = C(243, 227, 200), -- rice shade (wells)
+	Row = C(255, 255, 255),
+	Outline = C(43, 34, 51), -- nori ink
+	Nori = C(46, 74, 58),
+	Tab = C(255, 77, 94), -- maguro: title tab when a menu has no Accent
+	Title = C(255, 255, 255),
 	Text = C(255, 255, 255),
 	Subtle = C(200, 200, 208),
 }
 UIKit.Gradients = {
 	On = { C(90, 245, 70), C(20, 170, 25) },
 	Off = { C(255, 80, 80), C(190, 20, 25) },
-	Dark = { C(78, 78, 84), C(58, 58, 64) },
+	Dark = { C(150, 140, 165), C(107, 100, 120) }, -- idle / locked buttons
 	Blue = { C(120, 200, 255), C(50, 130, 235) },
 	Gold = { C(255, 225, 90), C(240, 160, 30) },
+}
+-- ui-pack icons uploaded to Roblox (source PNGs in ui-pack/png/icons)
+UIKit.Icons = {
+	Cash = "rbxassetid://86977132722028", KG = "rbxassetid://77054810665173", Prestige = "rbxassetid://106894934408749",
+	Rebirth = "rbxassetid://127083807709778", Neko = "rbxassetid://82729323442828", Fish = "rbxassetid://99532932563369",
+	Shop = "rbxassetid://87572009239165", Index = "rbxassetid://110822634462607", Skills = "rbxassetid://94064905300177",
+	Runes = "rbxassetid://76995933450687", Titles = "rbxassetid://112077310164148", Profile = "rbxassetid://103855312644235",
+	Areas = "rbxassetid://88563570052209", Settings = "rbxassetid://77123630599798", Lock = "rbxassetid://114352185513038",
+	Close = "rbxassetid://131411246860776", Check = "rbxassetid://134013193952908", Gift = "rbxassetid://72553040115544",
+	Potion = "rbxassetid://92797308966824", Sushi = "rbxassetid://140627697806061", Lantern = "rbxassetid://79115921142727",
+	Robux = "rbxassetid://82329547939817",
+	Common = "rbxassetid://88390762231167", Uncommon = "rbxassetid://75562313728091", Rare = "rbxassetid://79074308220952",
+	Epic = "rbxassetid://125049005280752", Legendary = "rbxassetid://132535841414719", Mythic = "rbxassetid://126129947753662",
 }
 UIKit.Font = Enum.Font.FredokaOne
 
@@ -67,6 +83,19 @@ function UIKit.Label(parent, props, strokeThickness: number?)
 		UIKit.Stroke(t, strokeThickness or 2.5, C(28, 28, 32))
 	end
 	return t
+end
+
+-- An icon: an uploaded image ("rbxassetid://...", e.g. UIKit.Icons.Cash) or emoji text
+function UIKit.Icon(parent, icon: string?, props)
+	local i
+	if icon and string.sub(icon, 1, 13) == "rbxassetid://" then
+		i = new("ImageLabel", { BackgroundTransparency = 1, Image = icon, ScaleType = Enum.ScaleType.Fit }, parent)
+		for k, v in pairs(props) do (i :: any)[k] = v end
+	else
+		i = UIKit.Label(parent, props, 0)
+		i.Text = icon or ""
+	end
+	return i
 end
 
 local function gradient(parent, colors)
@@ -146,31 +175,53 @@ function UIKit.Window(opts)
 		BackgroundColor3 = UIKit.Colors.Panel,
 	}, gui)
 	UIKit.Corner(frame, 26)
-	UIKit.Stroke(frame, 5, accent or UIKit.Colors.Outline, true)
+	UIKit.Stroke(frame, 5, UIKit.Colors.Outline, true)
+	new("UIGradient", { Rotation = 90, Color = ColorSequence.new(C(255, 255, 255), C(246, 232, 210)) }, frame)
 	-- invisible button under the content so clicks inside the window never reach the backdrop (which closes it)
 	local sink = new("TextButton", { Name = "Sink", Text = "", AutoButtonColor = false, BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 0 }, frame)
 	sink:SetAttribute("NoSound", true)
 	local scale = new("UIScale", {}, frame)
 
-	-- header
-	UIKit.Label(frame, { Name = "Icon", Text = opts.Icon or "", Size = UDim2.fromOffset(58, 58), Position = UDim2.fromOffset(22, 16) }, 0)
-	local title = UIKit.Label(frame, {
+	-- nori band along the top (rounded top corners; the rice strip squares off its bottom)
+	local band = new("Frame", { Name = "Nori", Size = UDim2.new(1, 0, 0, 44), BackgroundColor3 = UIKit.Colors.Nori, BorderSizePixel = 0 }, frame)
+	UIKit.Corner(band, 26)
+	new("Frame", { Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 26), BackgroundColor3 = UIKit.Colors.Panel, BorderSizePixel = 0 }, band)
+	new("Frame", { Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = UIKit.Colors.Outline, BorderSizePixel = 0 }, band)
+
+	-- title tab: icon + title on the menu's colour
+	local tab = new("Frame", {
+		Name = "TitleTab",
+		AutomaticSize = Enum.AutomaticSize.X,
+		Position = UDim2.fromOffset(22, 26),
+		Size = UDim2.fromOffset(0, 58),
+		BackgroundColor3 = C(255, 255, 255),
+	}, frame)
+	UIKit.Corner(tab, 16)
+	UIKit.Stroke(tab, 4, UIKit.Colors.Outline, true)
+	local tabColor = accent or UIKit.Colors.Tab
+	gradient(tab, { tabColor, tabColor:Lerp(C(0, 0, 0), 0.18) })
+	new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 8) }, tab)
+	new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 18) }, tab)
+	UIKit.Icon(tab, opts.Icon, { Name = "Icon", Size = UDim2.fromOffset(52, 52), LayoutOrder = 1 })
+	local title = UIKit.Label(tab, {
 		Name = "Title",
 		Text = opts.Title,
-		TextColor3 = accent or UIKit.Colors.Title,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Size = UDim2.new(1, -290, 0, 58),
-		Position = UDim2.fromOffset(90, 16),
+		TextScaled = false,
+		TextSize = 40,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, 50),
+		LayoutOrder = 2,
 	}, 4)
+	-- close: red X on the top-right corner, same spot on every menu
 	local close = UIKit.Button(frame, {
 		Name = "Close",
-		Label = "Close",
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -18, 0, 16),
-		Size = UDim2.fromOffset(170, 60),
-		Colors = UIKit.Gradients.Dark,
-		StrokeColor = accent or C(150, 150, 156),
+		Position = UDim2.new(1, 16, 0, -16),
+		Size = UDim2.fromOffset(64, 64),
+		Colors = UIKit.Gradients.Off,
+		ZIndex = 3,
 	})
+	new("ImageLabel", { Name = "X", BackgroundTransparency = 1, Image = UIKit.Icons.Close, Size = UDim2.fromScale(0.78, 0.78), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), ZIndex = 3 }, close.Button)
 
 	local body = new("Frame", {
 		Name = "Body",
@@ -262,7 +313,7 @@ function UIKit.Row(parent, icon: string, text: string, order: number)
 	}, parent)
 	UIKit.Corner(row, 16)
 	UIKit.Stroke(row, 3, UIKit.Colors.Outline, true)
-	UIKit.Label(row, { Name = "Icon", Text = icon, Size = UDim2.fromOffset(50, 50), Position = UDim2.fromOffset(14, 12) }, 0)
+	UIKit.Icon(row, icon, { Name = "Icon", Size = UDim2.fromOffset(50, 50), Position = UDim2.fromOffset(14, 12) })
 	UIKit.Label(row, {
 		Name = "Text",
 		Text = text,

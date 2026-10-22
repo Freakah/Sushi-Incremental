@@ -23,10 +23,12 @@ local order = {
 	"NametagController",
 	"ZoneController",
 	"PropAnimationController",
+	"NpcTalkController",
 	"AmbientController",
 	"TutorialController",
 	"AscensionController",
 	"AdminController",
+	"DropperController",
 	"SushiController", -- last: tells the server we're ready for sushi
 }
 
